@@ -1,0 +1,33 @@
+{
+  "name": "webmcpify",
+  "version": "0.3.0",
+  "description": "Make any web app agent-ready, verifiably — an agent skill that integrates WebMCP end to end: inventory, integrate, verify in a real browser, heal.",
+  "license": "MIT",
+  "author": {
+    "name": "Jonas Tüchler",
+    "github": "TueJon",
+    "url": "https://jonastuechler.at"
+  },
+  "repository": "https://github.com/TueJon/webmcpify",
+  "homepage": "https://github.com/TueJon/webmcpify",
+  "keywords": [
+    "webmcp",
+    "ai-agents",
+    "browser-agents",
+    "claude-code",
+    "agent-skills",
+    "document.modelContext"
+  ],
+  "categories": ["web-development", "agent-architecture"],
+  "skills": [
+    {
+      "id": "webmcpify",
+      "path": "skills/webmcpify/SKILL.md",
+      "description": "End-to-end WebMCP integration pipeline: propose a tool manifest, integrate, verify every tool in a real browser, heal failures — zero unrelated changes."
+    }
+  ],
+  "agents": ["claude-code", "codex", "cursor", "opencode", "copilot", "gemini-cli"],
+  "install": {
+    "command": "npx skills add TueJon/webmcpify"
+  }
+}
