@@ -4,9 +4,9 @@
   "description": "Make any web app agent-ready, verifiably — an agent skill that integrates WebMCP end to end: inventory, integrate, verify, heal.",
   "license": "MIT",
   "version": "0.1.0",
-  "publisher": "tue-Jonas",
+  "publisher": "TueJon",
   "repository": {
-    "url": "https://github.com/tue-Jonas/webmcpify"
+    "url": "https://github.com/TueJon/webmcpify"
   },
   "engines": {
     "node": ">=20.0.0"

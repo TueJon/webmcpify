@@ -31,13 +31,13 @@ webmcpify packages all of that into one command for your coding agent.
 **Any agent** — Claude Code, Codex, Cursor, opencode, Copilot, and [70+ more](https://github.com/vercel-labs/skills):
 
 ```sh
-npx skills add tue-Jonas/webmcpify
+npx skills add TueJon/webmcpify
 ```
 
 **Claude Code** (as a plugin):
 
 ```
-/plugin marketplace add tue-Jonas/webmcpify
+/plugin marketplace add TueJon/webmcpify
 /plugin install webmcpify@webmcpify
 ```
 

@@ -1,5 +1,5 @@
 /**
- * webmcpify runtime — vendored from https://github.com/tue-Jonas/webmcpify (MIT).
+ * webmcpify runtime — vendored from https://github.com/TueJon/webmcpify (MIT).
  * Spec-pure helper around the W3C WebMCP API (document.modelContext).
  * Vendor this file into your project; do not add it as a dependency.
  *
