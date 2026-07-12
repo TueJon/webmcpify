@@ -101,7 +101,9 @@ Every phase is a **loop over persistent state**, not a one-shot pass:
   **behaviorally unchanged** in browsers without WebMCP.
 - **Exercised, not assumed** — every tool is enumerated and executed in real
   Chrome, asserting on both the tool result and the resulting UI state, from
-  examples recorded in the manifest.
+  examples recorded in the manifest. That includes mutating declarative forms,
+  where Chrome pauses the execution until a real submit interaction — the
+  harness performs that submit click mid-execution instead of faking the pass.
 
 ## What's in this repo
 

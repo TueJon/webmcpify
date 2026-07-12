@@ -1,7 +1,9 @@
 # Security checklist
 
 Apply at two points: **before the manifest gate** (classify + flag) and **at the
-final audit** (verify). Any unchecked box on a mutating tool blocks it.
+final audit** (verify). Any unchecked box on a `mutating: "server"` tool blocks
+it. Client-only mutations (`mutating: "client"`) still must pass the
+**Trust boundary** and **Honesty & hints** boxes.
 
 ## Threat model in one paragraph
 
@@ -31,6 +33,16 @@ both directions. Design every tool as if it were a public, authenticated API end
 - [ ] Initiation tools (`start_*_flow`) genuinely only navigate/open — they must
       not pre-execute any part of the mutation, and never carry `readOnlyHint`.
 
+**Production side effects (verification)**
+- [ ] Any verification that unavoidably causes a real production effect (e.g. an
+      Origin-allow-listed mailer) has explicit gate approval recorded in the
+      tool's `approval.productionSideEffect` — without it, the live path is
+      `skipped`, never executed.
+- [ ] Every such test payload is marked `[webmcpify verification]`, and every
+      caused effect is listed in `report.md`.
+- [ ] The Origin-replay pattern (`heal.md`) lives only in the env-gated harness
+      (`WEBMCP_LIVE_MUTATIONS=1`) — never in shipped code, never default-on in CI.
+
 **Honesty & hints**
 - [ ] Description says exactly what `execute()` does — no more, no less (agents make
       consent decisions from it).
@@ -55,3 +67,7 @@ both directions. Design every tool as if it were a public, authenticated API end
 - [ ] No third-party WebMCP runtime added to the project; enumeration/execution
       surfaces (`getTools`/`executeTool`, legacy `modelContextTesting`) appear
       nowhere in shipped application code.
+- [ ] Component-side `webmcp:*` event bridges attach only when
+      `isWebMCPAvailable()` and validate their event payloads — a page script can
+      dispatch the same CustomEvents; the bridge must not become an unvalidated
+      side door into app actions.

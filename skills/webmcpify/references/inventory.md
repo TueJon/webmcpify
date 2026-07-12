@@ -8,13 +8,15 @@ Establish, in this order:
    absence of one (static HTML). Record `app.stack` and `app.typescript`.
 2. **Start command + base URL**: `dev`/`start` scripts, framework defaults
    (`vite` → 5173, `next` → 3000, static → any file server). Verification needs a
-   working local run — if the app can't be started, record the blocker in the
-   manifest and surface it at the gate; don't silently proceed to a verify phase
-   that cannot run.
+   working local run — if the app can't be started, append the blocker to
+   `pipeline.blockers` and surface it at the gate; don't silently proceed to a
+   verify phase that cannot run.
 3. **Auth model**: none / session / role-based — plus **how a test session signs
-   in** (test account, seeded fixture, env credentials). Record it; the verify
-   phase runs from this. Role-based apps need role-scoped registration
-   (`integrate.md` §Auth) and a per-role verify pass.
+   in**, recorded per role under `app.authFixtures`: `obtain` (the exact steps —
+   seed command, login route), `account`, and `env` (the env var **names** the
+   fixture needs — never secret values in the manifest). The verify phase runs
+   from this. Role-based apps need role-scoped registration (`integrate.md`
+   §Auth) and a per-role verify pass.
 4. **Git baseline**: `pipeline.baselineSha` = HEAD, `pipeline.baselineDirty` =
    `git status --porcelain` paths. Dirty files are untouchable for the whole run.
 
@@ -34,15 +36,23 @@ Walk each area's UI code and list **user actions**, not functions:
 |---|---|---|---|
 | Search/filter form or input | `search_<noun>` | false | true |
 | Data list/detail currently rendered | `list_<noun>` / `get_<noun>` | false | true |
-| Create/edit form with submit → API call | `create_<noun>` / `update_<noun>` | true | — |
-| Button triggering a state change | `<verb>_<noun>` | true | — |
+| Create/edit form with submit → API call | `create_<noun>` / `update_<noun>` | "server" | — |
+| Button triggering a server state change | `<verb>_<noun>` | "server" | — |
+| Preference/theme/localStorage toggle | `<verb>_<noun>` | "client" | — |
 | Multi-step flow (wizard, checkout) | `start_<noun>_flow` (initiation) | false* | **never** |
-| Contact/booking form (static sites) | declarative form annotation | true | — |
+| Contact/booking form (static sites) | declarative form annotation | "server" | — |
 
 *Initiation tools only navigate/open the flow — the human completes it. They are
 classified non-mutating (no data changes) **but must NOT carry `readOnlyHint`**:
 they change UI state, and agents skip confirmations for hinted-read-only tools.
 `readOnlyHint: true` is reserved for genuinely pure data reads.
+
+`mutating` is tri-state: `false` | `"client"` (browser-local only: prefs, theme,
+localStorage — nothing leaves the browser) | `"server"` (data leaves the browser).
+`"server"` gets the full ceremony — per-tool approval, required `cleanup`,
+dev/test-data-only verification; `"client"` may be batch-approved at the gate
+(`cleanup` recommended). `toolautosubmit` is banned for **both** mutation classes
+(ground rule 5).
 
 **Skip** (do not inventory): login/logout/auth flows, payment execution, account
 deletion, user management, anything irreversible, file uploads (v1), and pure
@@ -59,8 +69,8 @@ Agents degrade when many similar tools compete. Enforce while drafting:
   user request. Merge them (one tool, richer schema) or sharpen both descriptions
   until they are disjoint.
 - **Role/tenant coverage**: for role-scoped apps, note per tool which roles can use
-  it (`auth: "role:<name>"`); the toolset a given session sees must stay within
-  budget too.
+  it (`auth: ["role:<name>", ...]`); the toolset a given session sees must stay
+  within budget too.
 
 ## Naming and schema conventions (Google's, condensed)
 
@@ -89,11 +99,22 @@ Agents degrade when many similar tools compete. Enforce while drafting:
 
 ## Writing manifest entries
 
-Fill EVERY field of the v2 schema — `route`, `auth`, `examples` (one valid + one
-invalid), `expect` (result substring + a UI assertion a test can check), and
-`cleanup` for mutating tools. The verify phase must be able to run from the
-manifest alone, without re-reading the codebase — that is what makes runs
-resumable by a different agent.
+Fill EVERY field of the v3 schema:
+
+- `route` + `auth` (array of roles keying into `app.authFixtures`; verify runs
+  once per role).
+- `annotations` — `readOnlyHint`/`untrustedContentHint` per the candidate table;
+  verify asserts them on the enumerated tool.
+- `examples` — one valid + one invalid. `invalid: null` is allowed ONLY for
+  readOnly tools with no/empty params (verify then asserts dual-outcome); the
+  convention for a non-null invalid on zero-param tools is `{"unexpected": true}`.
+- `expect` — exactly ONE of `result` (substring of the resolved string) or
+  `navigation` (destination URL/pattern when `executeTool` resolves `null`),
+  plus `ui` (a UI assertion a test can check).
+- `cleanup` — required for `mutating: "server"`, recommended for `"client"`.
+
+The verify phase must be able to run from the manifest alone, without re-reading
+the codebase — that is what makes runs resumable by a different agent.
 
 The completeness pass at the end of Phase 1: start the app (or read the rendered
 nav), enumerate what a user can *do* per screen, and diff against the manifest.

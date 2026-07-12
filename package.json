@@ -1,9 +1,9 @@
 {
   "name": "webmcpify",
   "displayName": "webmcpify",
-  "description": "Make any web app agent-ready, verifiably \u2014 an agent skill that integrates WebMCP end to end: inventory, integrate, verify, heal.",
+  "description": "Make any web app agent-ready, verifiably — an agent skill that integrates WebMCP end to end: inventory, integrate, verify, heal.",
   "license": "MIT",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "TueJon",
   "repository": {
     "url": "https://github.com/TueJon/webmcpify"
@@ -22,5 +22,18 @@
         "path": "./skills/webmcpify/SKILL.md"
       }
     ]
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.templates.json && tsc -p tsconfig.spec.json && tsc -p tsconfig.jsx.json",
+    "syntaxcheck": "node --check skills/webmcpify/templates/webmcpify.js",
+    "test": "node --test \"tests/*.test.mjs\"",
+    "check": "npm run typecheck && npm run syntaxcheck && npm test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.0",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "esbuild": "^0.25.5",
+    "typescript": "~5.9.3"
   }
 }

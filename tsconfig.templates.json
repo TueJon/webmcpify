@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "lib": ["DOM", "ES2020"],
+    "types": [],
+    "target": "ES2020",
+    "module": "ES2020",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "skipLibCheck": false
+  },
+  "files": [
+    "skills/webmcpify/templates/webmcpify.ts",
+    "skills/webmcpify/templates/webmcp.d.ts"
+  ]
+}

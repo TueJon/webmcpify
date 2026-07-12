@@ -49,6 +49,24 @@ form.addEventListener('submit', (e) => {
   target page is best-effort garnish — the mechanism is still under spec debate;
   never make behavior depend on it.
 
+### Framework notes — React
+
+- Vendor `templates/webmcp-jsx.d.ts` alongside the ambient types so strict TSX
+  accepts `toolname`/`tooldescription`/`toolparamdescription` (it augments the
+  React attribute interfaces; it is a MODULE file — keep it separate from
+  `webmcp.d.ts`).
+- The typings are string-valued (boolean-attribute style): write
+  `toolautosubmit=""` — and only on pure read forms (ground rule 5).
+- In `onSubmit`, the WebMCP fields live on the NATIVE event:
+
+  ```tsx
+  const native = e.nativeEvent as SubmitEvent;
+  if (native.agentInvoked) native.respondWith?.(doSubmit(new FormData(e.currentTarget))
+    .then(() => 'Request received. Reply within one business day.'));
+  ```
+
+  Pass the PROMISE of the result string, not an already-resolved value.
+
 ## Imperative — SPAs and dynamic apps
 
 Use the vendored runtime (`runtime.md`). Tools live in a dedicated module per app
@@ -86,7 +104,12 @@ Key rules:
   `runtime.md`. A canned success before the work finishes is a false green.
 - Return short strings; errors as `"ERROR: <what and how to fix>"` so the model can
   self-correct. Cap outputs ~1.5k chars.
-- Validate strictly in code, loosely in schema.
+- Validate strictly in code, loosely in schema — and keep **parity with the
+  form's native HTML constraints**: when a tool wraps a form, probe the real
+  constraints on a detached clone instead of re-implementing them —
+  `const probe = emailInput.cloneNode() as HTMLInputElement; probe.value = value;`
+  then reject when `!probe.checkValidity()`. `execute()` must refuse exactly what
+  the form itself would refuse.
 
 ### Registration & lifecycle
 
@@ -114,5 +137,5 @@ production exposure the origin needs a token:
 header — registered at the Chrome Origin Trials console. For local work,
 `chrome://flags/#enable-webmcp-testing`. Chrome **silently ignores** expired
 tokens, so nothing may depend on WebMCP being present (ground rule 4). Add a short
-note about this to the target repo's README as part of setup, and record
-`pipeline.setup.originTrialNoted`.
+note about this to the target repo's README as part of setup, and record the
+touched file path in `pipeline.setup.originTrialNoted` (e.g. `["README.md"]`).
