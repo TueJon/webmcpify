@@ -1,0 +1,25 @@
+{
+  "name": "webmcpify",
+  "displayName": "webmcpify",
+  "description": "Make any web app agent-ready, verifiably — an agent skill that integrates WebMCP end to end: inventory, integrate, verify, heal.",
+  "license": "MIT",
+  "version": "0.1.0",
+  "publisher": "tue-Jonas",
+  "repository": {
+    "url": "https://github.com/tue-Jonas/webmcpify"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "contributes": {
+    "chatSkills": [
+      {
+        "path": "./skills/webmcpify/SKILL.md"
+      }
+    ]
+  }
+}

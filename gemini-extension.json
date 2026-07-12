@@ -1,0 +1,8 @@
+{
+  "name": "webmcpify",
+  "description": "Integrate WebMCP into any existing web app — inventory, integrate, verify, heal — without touching unrelated logic or UI.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Jonas Tüchler"
+  }
+}
