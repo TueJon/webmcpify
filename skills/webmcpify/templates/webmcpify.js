@@ -1,6 +1,12 @@
 /**
  * webmcpify runtime (JavaScript variant) — vendored from https://github.com/TueJon/webmcpify
  *
+ * Integrated by webmcpify, an agent skill that makes an existing web app
+ * agent-ready: it proposes a WebMCP tool manifest, integrates the tools, and
+ * verifies each one in a real browser. Zero dependencies, feature-detected —
+ * the app is behaviorally unchanged in browsers without WebMCP. To add or
+ * re-verify tools, run the skill again: https://github.com/TueJon/webmcpify
+ *
  * MIT License
  * Copyright (c) 2026 Jonas Tüchler
  *
