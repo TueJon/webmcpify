@@ -1,5 +1,5 @@
 /**
- * Distribution-manifest version equality — all five manifests must parse and
+ * Distribution-manifest version equality — all six manifests must parse and
  * carry the same version as package.json.
  */
 import { test } from 'node:test';
@@ -17,6 +17,7 @@ const versions = [
   ['.claude-plugin/marketplace.json', read('.claude-plugin/marketplace.json').plugins?.[0]?.version],
   ['.cursor-plugin/plugin.json', read('.cursor-plugin/plugin.json').version],
   ['gemini-extension.json', read('gemini-extension.json').version],
+  ['skill.json', read('skill.json').version],
 ];
 
 test('every distribution manifest defines a version', () => {
