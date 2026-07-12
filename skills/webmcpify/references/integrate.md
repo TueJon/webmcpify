@@ -3,11 +3,13 @@
 > Prefer the live official guides when online:
 > `npx -y modern-web-guidance@latest retrieve "webmcp,agentic-forms,agentic-javascript-tools"`.
 > The patterns below follow Google's reference implementations
-> (GoogleChromeLabs/webmcp-tools) and the W3C spec draft.
+> (GoogleChromeLabs/webmcp-tools) and the W3C CG draft.
 
-## Declarative — plain HTML forms (static sites, SSGs, server-rendered pages)
+## Declarative — standard HTML forms
 
-Annotate the existing form. Do not restructure it.
+Applies to plain HTML, SSG-emitted, server-rendered, and framework-rendered
+(uncontrolled) forms — anywhere a real `<form>` with named controls exists.
+Annotate the existing form; do not restructure it.
 
 ```html
 <form toolname="request_quote"
@@ -22,29 +24,30 @@ Annotate the existing form. Do not restructure it.
 ```
 
 Rules:
-- Browser derives the JSON Schema from the controls — so every control needs
+- The browser derives the JSON Schema from the controls — every control needs
   `name`, a resolvable description (`toolparamdescription` → `label[for]` text →
-  `aria-description`), and correct HTML constraints (`required`, `type`, `min`…).
-  Radio groups: put `toolparamdescription` on the enclosing `<fieldset>`.
+  `aria-description`), and correct HTML constraints. Radio groups: description on
+  the enclosing `<fieldset>`.
 - `toolautosubmit` **only** on pure read forms (search/filter/availability).
   Never on contact/checkout/settings/messaging forms.
-- If the form is fetch-submitted (`preventDefault()`), you MUST route the result
-  back to the agent — the most common integration bug is a swallowed submit:
+- Fetch-submitted forms (`preventDefault()`) MUST route the result back to the
+  agent — the most common integration bug is a swallowed submit:
 
 ```js
 form.addEventListener('submit', (e) => {
   e.preventDefault();
   const result = doSubmit(new FormData(e.target))
     .then(() => 'Request received. Reply within one business day.');
-  if (e.agentInvoked) e.respondWith(result);
+  if (e.agentInvoked) e.respondWith(result); // pass the PROMISE, not a value
 });
 ```
 
 - Optional UX (verbatim from Chrome docs): style agent activity with
   `form:tool-form-active` / `:tool-submit-active` CSS pseudo-classes.
-- Forms that navigate to a thank-you page: best-effort JSON-LD
-  `{"@type":"Message","text":"…"}` as the first script block of the target page
-  (mechanism still under spec debate — never make product behavior depend on it).
+- Forms that navigate to a thank-you page: `executeTool` returns `null` on
+  navigation (expected). A JSON-LD `{"@type":"Message","text":"…"}` block on the
+  target page is best-effort garnish — the mechanism is still under spec debate;
+  never make behavior depend on it.
 
 ## Imperative — SPAs and dynamic apps
 
@@ -65,11 +68,10 @@ export const searchTicketsTool = {
     required: ['query'],
   },
   annotations: { readOnlyHint: true, untrustedContentHint: true },
-  async execute(input) {
+  async execute(input: Record<string, unknown>) {
     const q = String(input.query ?? '').trim();
     if (!q) return 'ERROR: `query` must be a non-empty string.';
-    return dispatchAndWait('webmcp:search_tickets', { query: q },
-      'Search started. Results are now visible on the page.');
+    return dispatchAndWait('webmcp:search_tickets', { query: q });
   },
 };
 ```
@@ -78,9 +80,10 @@ Key rules:
 - **`execute()` wraps the existing UI code path** — dispatch the same event / call
   the same store action / hit the same API the button does. Never a parallel
   implementation.
-- **Return only after the interface state is settled** (agents plan from what's on
-  screen) — that's what `dispatchAndWait` is for: the component signals completion
-  after its state update.
+- **Return only after the interface state is settled**: the component listener
+  awaits the real work, then fires the completion event with the outcome payload
+  (`{ ok, message | error }`) — full contract and component example in
+  `runtime.md`. A canned success before the work finishes is a false green.
 - Return short strings; errors as `"ERROR: <what and how to fix>"` so the model can
   self-correct. Cap outputs ~1.5k chars.
 - Validate strictly in code, loosely in schema.
@@ -92,20 +95,24 @@ Key rules:
   `createToolScope` in the view's mount/unmount (React `useEffect` cleanup, Vue
   `onUnmounted`, Angular `DestroyRef`). Over-scoping makes the toolset flicker and
   strands agents mid-plan.
-- React StrictMode double-mount is handled by the runtime's scope registry.
+- Registration failures roll back the scope and surface via `onError` — check the
+  console during integration; a silently missing toolset usually means a duplicate
+  name or invalid schema rejected the batch.
 
 ### Auth / roles (SaaS)
 
 Never register a tool the current session couldn't use through the UI. On
-login/logout/role change/tenant switch: abort the whole scope and re-register the
-correct set. The server still re-checks everything (ground rule 3) — role-scoped
-registration is UX hygiene, not security.
+login/logout/role change/tenant switch: dispose the scope and re-register the
+correct set (`runtime.md` §Wiring). The server still re-checks everything (ground
+rule 3) — role-scoped registration is UX hygiene, not security.
 
 ## Origin trial / flags note
 
-WebMCP is an origin trial (Chrome 149→). For production exposure the origin needs a
-token: `<meta http-equiv="origin-trial" content="TOKEN">` or an `Origin-Trial`
-response header — registration at the Chrome Origin Trials console. For local work,
-`chrome://flags/#enable-webmcp-testing`. Chrome silently ignores expired tokens, so
-nothing may depend on WebMCP being present (ground rule 4). Add a short note about
-this to the target repo's README as part of the runtime install.
+WebMCP is a Chrome origin trial (149→, stable milestone still an estimate). For
+production exposure the origin needs a token:
+`<meta http-equiv="origin-trial" content="TOKEN">` or an `Origin-Trial` response
+header — registered at the Chrome Origin Trials console. For local work,
+`chrome://flags/#enable-webmcp-testing`. Chrome **silently ignores** expired
+tokens, so nothing may depend on WebMCP being present (ground rule 4). Add a short
+note about this to the target repo's README as part of setup, and record
+`pipeline.setup.originTrialNoted`.

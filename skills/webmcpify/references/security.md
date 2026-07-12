@@ -1,7 +1,7 @@
 # Security checklist
 
 Apply at two points: **before the manifest gate** (classify + flag) and **at the
-final diff audit** (verify). Any unchecked box on a mutating tool blocks it.
+final audit** (verify). Any unchecked box on a mutating tool blocks it.
 
 ## Threat model in one paragraph
 
@@ -24,16 +24,18 @@ both directions. Design every tool as if it were a public, authenticated API end
 **Human-in-the-loop**
 - [ ] No `toolautosubmit` on any state-changing form.
 - [ ] No destructive/irreversible/payment tools at all in a first integration.
-      If the human explicitly insists later: in-page manual confirmation PLUS a
-      server-side two-step (confirm token), never a client-side check alone.
-- [ ] Initiation tools (`start_*_flow`) genuinely only navigate/open — they must not
-      pre-execute any part of the mutation.
+      If the human explicitly insists later: an in-page manual confirmation the
+      **user** performs, PLUS a server-side two-step (short-lived confirm token).
+      No client-side API exists that can force an agent to confirm — never rely on
+      one.
+- [ ] Initiation tools (`start_*_flow`) genuinely only navigate/open — they must
+      not pre-execute any part of the mutation, and never carry `readOnlyHint`.
 
 **Honesty & hints**
 - [ ] Description says exactly what `execute()` does — no more, no less (agents make
       consent decisions from it).
-- [ ] `readOnlyHint: true` ONLY on genuinely pure reads (agents skip confirmation
-      based on it; mislabeling is the worst single mistake).
+- [ ] `readOnlyHint: true` ONLY on genuinely pure data reads (agents skip
+      confirmation based on it; mislabeling is the worst single mistake).
 - [ ] `untrustedContentHint: true` on every tool returning user-generated or
       external content.
 - [ ] Outputs capped (~1.5k chars) and free of instruction-like content where
@@ -50,5 +52,6 @@ both directions. Design every tool as if it were a public, authenticated API end
 - [ ] Pages that must never expose tools (un-audited checkout, admin consoles you
       didn't inventory) can send `Permissions-Policy: tools=()` — suggest it in the
       report where relevant.
-- [ ] No third-party WebMCP runtime added to the project; test-only APIs
-      (`navigator.modelContextTesting`) appear nowhere in shipped code.
+- [ ] No third-party WebMCP runtime added to the project; enumeration/execution
+      surfaces (`getTools`/`executeTool`, legacy `modelContextTesting`) appear
+      nowhere in shipped application code.

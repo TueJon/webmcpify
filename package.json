@@ -1,14 +1,15 @@
 {
   "name": "webmcpify",
   "displayName": "webmcpify",
-  "description": "Make any web app agent-ready, verifiably — an agent skill that integrates WebMCP end to end: inventory, integrate, verify, heal.",
+  "description": "Make any web app agent-ready, verifiably \u2014 an agent skill that integrates WebMCP end to end: inventory, integrate, verify, heal.",
   "license": "MIT",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "TueJon",
   "repository": {
     "url": "https://github.com/TueJon/webmcpify"
   },
   "engines": {
+    "vscode": "^1.90.0",
     "node": ">=20.0.0"
   },
   "categories": [

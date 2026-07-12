@@ -1,27 +1,35 @@
 # Heal — failure taxonomy → fixes
 
 Work one failed tool at a time. Re-verify after each fix. Three failed attempts →
-mark `skipped` with a blocker note and move on. **Never** widen the diff, disable a
-check, or fake a return value to force a pass.
+mark `skipped` with a blocker note (this is an explicit escalation to the human in
+the final report, not a silent drop) and move on. **Never** widen the diff, disable
+a check, or fake a return value to force a pass. **Mutating tools:** run the
+manifest `cleanup` between attempts — retrying a mutation without cleanup
+duplicates data.
 
 ## Taxonomy
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Tool absent from `listTools()` | Registration never ran (bootstrap not reached, view not mounted, scope key collision) or flag/Chrome version wrong | Trace the registration call; check `isWebMCPAvailable()` actually true in the test env; verify flags and Chrome ≥150 |
-| Tool absent after route change | Scope disposed by navigation (over-scoping) | Move the tool to static app-level registration unless it is genuinely view-bound |
-| Declarative tool missing | `toolname` typo, form inside a frame without `allow="tools"`, or page sends `Origin-Agent-Cluster: ?0` | Fix attribute; check Permissions-Policy `tools` and origin-keying headers |
-| Schema mismatch (declarative) | Control lacks `name`, description not resolvable, unsupported control type in this Chrome build | Add `name`/`toolparamdescription`/`label[for]`; for unsupported controls switch that form to an imperative tool |
-| Schema mismatch (imperative) | Manifest and code drifted | Make code match the approved manifest (not vice versa); if the manifest was wrong, update it and note the change for the human |
-| `executeTool` hangs / times out | `dispatchAndWait` completion event never fired (listener missing, wrong event name, requestId not threaded) | Wire the component listener; fire completion after state settles (`queueMicrotask` after the update) |
+| Tool absent from enumeration | Registration never ran (bootstrap not reached, view not mounted) or wrong Chrome build/flags | Trace the registration call; confirm `isWebMCPAvailable()` in the test env; current Chrome + `--enable-features=WebMCP,WebMCPTesting` |
+| Whole scope absent | A registration in the batch rejected (duplicate name, invalid schema, policy) — the runtime rolls back the entire scope | Check console for the `onError` report; fix the offending tool contract |
+| Tool absent after route change | Scope disposed by navigation (over-scoping) | Move to static app-level registration unless genuinely view-bound |
+| Declarative tool missing | `toolname` typo, frame without `allow="tools"`, or page sends `Origin-Agent-Cluster: ?0` | Fix attribute; check Permissions-Policy `tools` and origin-keying headers |
+| Schema mismatch (declarative) | Control lacks `name`, description not resolvable, unsupported control type in this build | Add `name`/`toolparamdescription`/`label[for]`; unsupported controls → switch that form to imperative |
+| Schema mismatch (imperative) | Manifest and code drifted | Make code match the approved manifest; if the manifest was wrong, update it and flag the change in the report |
+| Assertion compares object to string | Enumerated `inputSchema` is a stringified JSON Schema | `JSON.parse` before comparing (see `verify.md`) |
+| `executeTool` returns `null` unexpectedly | The execution navigated (normal for submit-navigating declarative forms) | Assert on the post-navigation page instead of the return value |
+| `executeTool` rejects | Schema violation or declarative-validation failure — rejection IS the failure signal for these | For invalid-input tests on declarative tools, assert rejection, not an `"ERROR:"` string |
+| Execution times out / canned success while UI still loading | Completion event fired before the async work finished, or listener missing/wrong event name | Fire `tool-completion-<requestId>` with `{ ok, message/error }` AFTER awaiting the real work (`runtime.md` contract) |
 | Returns success but UI unchanged | `execute()` bypassed the real UI path (parallel implementation) | Rewrite to call the same handler/store action/endpoint the UI uses |
-| Invalid input returns success | Missing in-code validation | Validate strictly in code; return `"ERROR: <what/how to fix>"` |
+| Invalid input resolves successfully (imperative) | Missing in-code validation | Validate strictly in code; return `"ERROR: <what/how to fix>"` |
 | Fetch-submitted form: agent gets nothing | `preventDefault()` without `respondWith()` | Add the `e.agentInvoked → e.respondWith(promise)` bridge |
-| Works manually, fails in Playwright | Headless, missing flags, or profile without the origin trial | Headed + `--enable-features=WebMCP,DevToolsWebMCPSupport`; persistent context |
-| 401/403 from `execute()` in test | Tool registered outside the authenticated scope, or test session lacks the role | Role-scope the registration; use a test account with the right role |
-| Flaky: passes alone, fails in suite | Shared state between tool executions | Isolate test data per tool run; don't "fix" by reordering tests |
+| Works manually, fails in Playwright | Headless, missing flags, or profile without the flag | Headed + flags; persistent context; `xvfb-run` in CI |
+| 401/403 from `execute()` in test | Tool registered outside the authenticated scope, or test session lacks the role in the manifest `auth` field | Role-scope the registration; sign in with the recorded fixture |
+| Flaky: passes alone, fails in suite | Shared state between tool executions | Isolate test data per tool run (use `cleanup`); don't reorder tests to hide it |
 
 ## After healing
 
-Re-run the **full** verify loop once at the end (not just the healed tools) — healing
-one tool can unregister another (scope collisions are the classic case).
+Re-run verification once for **all** tools with status `integrated` or `verified`
+(not only the healed ones) — healing one tool can unregister or break another;
+scope collisions are the classic case. Only then evaluate the exit condition.

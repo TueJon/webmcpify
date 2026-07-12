@@ -4,49 +4,63 @@
 
 Establish, in this order:
 
-1. **Stack**: look at `package.json` (deps: react/vue/@angular/next/astro/eleventy…),
-   or absence of one (static HTML). Record as `app.stack`.
+1. **Stack**: `package.json` deps (react/vue/@angular/next/astro/eleventy…) or the
+   absence of one (static HTML). Record `app.stack` and `app.typescript`.
 2. **Start command + base URL**: `dev`/`start` scripts, framework defaults
-   (`vite` → 5173, `next` → 3000, static → any file server). The verify phase needs
-   a working local run — if the app can't be started, record that as a blocker and
-   ask the human before proceeding past integration.
-3. **Auth model**: none / session / role-based. Role-based apps need role-scoped
-   registration (see `integrate.md` §Auth) and their mutating tools deserve extra
-   scrutiny at the gate.
-4. **TypeScript?** Determines whether to vendor the runtime as `.ts` or `.js`.
+   (`vite` → 5173, `next` → 3000, static → any file server). Verification needs a
+   working local run — if the app can't be started, record the blocker in the
+   manifest and surface it at the gate; don't silently proceed to a verify phase
+   that cannot run.
+3. **Auth model**: none / session / role-based — plus **how a test session signs
+   in** (test account, seeded fixture, env credentials). Record it; the verify
+   phase runs from this. Role-based apps need role-scoped registration
+   (`integrate.md` §Auth) and a per-role verify pass.
+4. **Git baseline**: `pipeline.baselineSha` = HEAD, `pipeline.baselineDirty` =
+   `git status --porcelain` paths. Dirty files are untouchable for the whole run.
 
 ## Building the area map
 
 The area map is the unit of loop iteration. Sources, in order of preference:
-
-- **Router config** (React Router routes, Next `app/`/`pages/` dirs, Vue Router,
-  Angular routes) — each top-level route = one area.
-- **Navigation UI** (header/sidebar links) for static sites and SSGs.
-- **Feature folders** (`src/features/*`, `src/modules/*`) when routing is flat.
-
-Keep areas coarse: 5–30 areas for a big SaaS, 1–3 for a landing page. An area
-should be deep-readable in one loop iteration without flooding context. Split an
-area that turns out too big; merge trivial ones.
+router config (React Router, Next `app/`/`pages/`, Vue Router, Angular routes) →
+navigation UI (static/SSG) → feature folders (`src/features/*`). Keep areas
+coarse: 5–30 for a big SaaS, 1–3 for a landing page. Split an area that turns out
+too big; merge trivial ones.
 
 ## What counts as a candidate tool
 
 Walk each area's UI code and list **user actions**, not functions:
 
-| UI pattern | Candidate tool | `mutating` |
-|---|---|---|
-| Search/filter form or input | `search_<noun>` | false |
-| Data list/detail currently rendered | `list_<noun>` / `get_<noun>` | false |
-| Create/edit form with submit → API call | `create_<noun>` / `update_<noun>` | true |
-| Button triggering a state change | `<verb>_<noun>` | true |
-| Multi-step flow (wizard, checkout) | `start_<noun>_flow` (initiation only) | false* |
-| Contact/booking form (static sites) | declarative form annotation | true |
+| UI pattern | Candidate tool | `mutating` | `readOnlyHint` |
+|---|---|---|---|
+| Search/filter form or input | `search_<noun>` | false | true |
+| Data list/detail currently rendered | `list_<noun>` / `get_<noun>` | false | true |
+| Create/edit form with submit → API call | `create_<noun>` / `update_<noun>` | true | — |
+| Button triggering a state change | `<verb>_<noun>` | true | — |
+| Multi-step flow (wizard, checkout) | `start_<noun>_flow` (initiation) | false* | **never** |
+| Contact/booking form (static sites) | declarative form annotation | true | — |
 
-*Initiation tools only navigate/open the flow — the human completes it. That is the
-correct way to expose complex mutations without automating them.
+*Initiation tools only navigate/open the flow — the human completes it. They are
+classified non-mutating (no data changes) **but must NOT carry `readOnlyHint`**:
+they change UI state, and agents skip confirmations for hinted-read-only tools.
+`readOnlyHint: true` is reserved for genuinely pure data reads.
 
 **Skip** (do not inventory): login/logout/auth flows, payment execution, account
 deletion, user management, anything irreversible, file uploads (v1), and pure
-navigation that agents can do anyway.
+navigation agents can do anyway.
+
+## Tool budget, overlap, and priority (what keeps SaaS toolsets usable)
+
+Agents degrade when many similar tools compete. Enforce while drafting:
+
+- **Budget**: aim for ≤15 tools active in any app state (app-wide + current view).
+  If an area yields more candidates, keep the highest-value ones as `priority: 1`
+  and mark the rest `priority: 2/3` — the gate decides which waves ship.
+- **Overlap rule**: no two tools whose descriptions could plausibly match the same
+  user request. Merge them (one tool, richer schema) or sharpen both descriptions
+  until they are disjoint.
+- **Role/tenant coverage**: for role-scoped apps, note per tool which roles can use
+  it (`auth: "role:<name>"`); the toolset a given session sees must stay within
+  budget too.
 
 ## Naming and schema conventions (Google's, condensed)
 
@@ -54,20 +68,32 @@ navigation that agents can do anyway.
   `start_event_creation_process` merely opens a form. The name must never lie.
 - Name ≤30 chars, `[a-zA-Z0-9_.-]`; prefix with the app name if tools may coexist
   with other origins' tools in testing (`myapp_search_tickets`).
-- Description ≤500 chars, positive capability statement ("Searches the catalog…"),
-  no marketing. Param descriptions ≤150 chars.
-- **Raw user input rule**: schemas accept what the user would say ("11:00 to 15:00"),
-  never ask the agent to compute or transform. Use semantic enum values
+- Description ≤500 chars, positive capability statement, no marketing. Param
+  descriptions ≤150 chars. The description must say exactly what `execute()` does —
+  agents make consent decisions from it.
+- **Raw user input rule**: schemas accept what the user would say ("11:00 to
+  15:00"), never ask the agent to compute or transform. Semantic enum values
   (`"High"`, not `priority_id: 3`).
-- Read-only tools get `annotations: { readOnlyHint: true }`; tools returning
-  user-generated or external content get `untrustedContentHint: true`.
+- Tools returning user-generated or external content get
+  `untrustedContentHint: true`.
+
+## Choosing `kind`
+
+- `declarative` — any standard `<form>` whose fields map 1:1 to the action's
+  inputs: plain HTML, SSG-emitted, server-rendered, *and* framework-rendered forms
+  (uncontrolled inputs), including fetch-submitted forms (they bridge results via
+  `respondWith` — see `integrate.md`).
+- `imperative` — non-form actions (buttons, drag/drop, selections), actions whose
+  inputs come from app state rather than form fields, and React/Vue **controlled**
+  forms (agent-driven fill would bypass the framework's state).
 
 ## Writing manifest entries
 
-For every candidate record: `id`, `area`, `kind` (`declarative` for plain HTML forms
-that exist in the markup; `imperative` for anything driven by JS state), `mutating`,
-`description`, `inputSchema`, `source` (file:line of the UI handler/form — this is
-what the integrate phase wraps), `status: "discovered"`.
+Fill EVERY field of the v2 schema — `route`, `auth`, `examples` (one valid + one
+invalid), `expect` (result substring + a UI assertion a test can check), and
+`cleanup` for mutating tools. The verify phase must be able to run from the
+manifest alone, without re-reading the codebase — that is what makes runs
+resumable by a different agent.
 
 The completeness pass at the end of Phase 1: start the app (or read the rendered
 nav), enumerate what a user can *do* per screen, and diff against the manifest.
