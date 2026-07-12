@@ -1,7 +1,6 @@
 ---
 name: webmcpify
-description: |
-  Make any web app agent-ready: investigate the codebase, propose a reviewable WebMCP tool manifest, then integrate, verify in a real browser, and heal — without touching unrelated logic or UI. Use when asked to "webmcpify" a project, add WebMCP, make an app/site agent-ready, or expose an app's actions to AI/browser agents. Resumable on any codebase size via `.webmcpify/manifest.json`. Not for backend-only MCP servers, automating third-party sites, or generic SEO.
+description: Make a web app agent-ready — propose a WebMCP tool manifest, integrate, verify in a real browser, heal; unrelated code stays untouched. Use for "webmcpify", "add WebMCP", or "expose app actions to AI agents".
 argument-hint: "[inventory|integrate|verify|status|full] [scope notes]"
 license: MIT
 ---
@@ -23,6 +22,9 @@ DETECT ──▶ INVENTORY ──▶ [HUMAN GATE: manifest approval] ──▶ I
 Everything you need ships inside this skill directory: phase guides in
 `references/`, and vendorable code in `templates/` (runtime, ambient types,
 JS variant, verification spec). Never assume files exist outside the skill dir.
+
+**Out of scope** (stop and say so): backend-only MCP servers (that's classic MCP,
+not WebMCP), automating third-party sites you don't control, and generic SEO work.
 
 ## Invocation modes
 
