@@ -1,0 +1,12 @@
+--- a/proof/demo/index.html
++++ b/proof/demo/index.html
+@@
+ <script type="module" src="./app.js"></script>
++<script type="module" src="./webmcp-tools.js"></script>
+--- /dev/null
++++ b/proof/demo/webmcp-tools.js
+@@
++import { createToolScope } from '../../skills/webmcpify/templates/webmcpify.js';
++import { applyFilter } from './app.js';
++// Registers only after the recorded human gate dispatches webmcpify:integrate.
++window.addEventListener('webmcpify:integrate', () => createToolScope(...), { once: true });

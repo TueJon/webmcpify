@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WebMCPify proof — safe release-notes fixture</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header>
+    <div><b>webmcpify</b> / reproducible proof</div>
+    <span id="chrome">Chrome · native WebMCP</span>
+  </header>
+  <nav id="phases" aria-label="Pipeline">
+    <span data-phase="inventory">1 INVENTORY</span><span data-phase="gate">2 HUMAN GATE</span>
+    <span data-phase="integrate">3 INTEGRATE</span><span data-phase="verify">4 VERIFY</span>
+    <span data-phase="audit">5 AUDIT</span>
+  </nav>
+  <main>
+    <section class="app-card">
+      <div class="eyebrow">SAFE SAMPLE APP · LOOPBACK ONLY</div>
+      <h1>Release notes</h1>
+      <p class="lede">A tiny existing UI with one browser-local action. No auth, customer data, or network writes.</p>
+      <div class="filters" aria-label="Release filter">
+        <button data-filter="all" aria-pressed="true">All</button>
+        <button data-filter="feature" aria-pressed="false">Features</button>
+        <button data-filter="fix" aria-pressed="false">Fixes</button>
+      </div>
+      <div id="notes">
+        <article data-category="feature"><b>Command palette</b><small>feature</small></article>
+        <article data-category="fix"><b>Keyboard focus repair</b><small>fix</small></article>
+        <article data-category="feature"><b>Compact density</b><small>feature</small></article>
+        <article data-category="fix"><b>Offline retry repair</b><small>fix</small></article>
+      </div>
+      <p id="visible-count">4 release notes visible</p>
+    </section>
+    <section class="proof-card">
+      <div class="eyebrow" id="phase-label">WAITING</div>
+      <h2 id="proof-title">Real workflow, one continuous capture</h2>
+      <div id="manifest" hidden>
+        <code>set_release_filter</code><span>imperative · client-only</span>
+        <p>category: all | feature | fix</p>
+        <p>wraps existing <code>applyFilter()</code></p>
+      </div>
+      <div id="checks"></div>
+      <pre id="log" aria-live="polite"></pre>
+    </section>
+  </main>
+  <dialog id="gate">
+    <div class="eyebrow">HUMAN MANIFEST GATE</div>
+    <h2>Approve one client-only tool?</h2>
+    <p><code>set_release_filter</code> changes only visible browser state through the existing filter path.</p>
+    <ul><li>No server mutation</li><li>No personal data</li><li>No destructive/payment action</li></ul>
+    <button id="approve">Approve manifest</button>
+  </dialog>
+  <script type="module" src="./app.js"></script>
+  <script type="module" src="./webmcp-tools.js"></script>
+</body>
+</html>

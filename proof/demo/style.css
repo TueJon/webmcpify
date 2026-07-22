@@ -1,0 +1,32 @@
+:root { color-scheme: dark; --bg:#0d1110; --panel:#151b19; --line:#34413c; --ink:#f2f4ef; --muted:#9ba8a2; --green:#77e3a2; --amber:#ffc96b; }
+* { box-sizing:border-box; }
+[hidden] { display:none !important; }
+body { margin:0; min-height:100vh; background:var(--bg); color:var(--ink); font:18px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; }
+header { height:64px; padding:0 36px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--line); }
+header span { color:var(--green); font-size:14px; }
+nav { height:58px; padding:0 36px; display:flex; gap:10px; align-items:center; border-bottom:1px solid var(--line); }
+nav span { padding:7px 12px; color:var(--muted); border:1px solid transparent; font-size:13px; }
+nav span.active { color:var(--bg); background:var(--amber); border-color:var(--amber); }
+nav span.done { color:var(--green); border-color:var(--green); }
+main { display:grid; grid-template-columns:1fr 1fr; gap:24px; padding:28px 36px; }
+section { min-height:560px; padding:28px; border:1px solid var(--line); background:var(--panel); }
+.eyebrow { color:var(--amber); font-size:12px; letter-spacing:.12em; font-weight:800; }
+h1 { margin:.3em 0 .15em; font:700 42px/1.1 system-ui,sans-serif; }
+h2 { margin:.35em 0 .8em; font:700 27px/1.2 system-ui,sans-serif; }
+.lede { color:var(--muted); font:16px/1.5 system-ui,sans-serif; }
+.filters { display:flex; gap:8px; margin:25px 0 18px; }
+button { padding:10px 15px; color:var(--ink); background:#202925; border:1px solid var(--line); font:700 14px inherit; cursor:pointer; }
+button[aria-pressed="true"], #approve { color:var(--bg); background:var(--green); border-color:var(--green); }
+article { display:flex; justify-content:space-between; padding:15px 2px; border-bottom:1px solid var(--line); font-family:system-ui,sans-serif; }
+article small { color:var(--muted); }
+#visible-count { color:var(--green); font-size:14px; }
+#manifest { padding:18px; border:1px solid var(--amber); background:#101412; }
+#manifest span { float:right; color:var(--muted); font-size:13px; }
+#manifest p { margin:.65em 0 0; color:var(--muted); font-size:14px; }
+#checks { margin-top:20px; }
+.check { margin:8px 0; color:var(--green); }
+pre { min-height:260px; margin-top:20px; padding:16px; overflow:hidden; white-space:pre-wrap; color:#cdd7d2; background:#090c0b; border:1px solid #27302d; font-size:13px; line-height:1.55; }
+dialog { width:620px; color:var(--ink); background:#171e1b; border:2px solid var(--amber); box-shadow:0 24px 90px #000; padding:30px; }
+dialog::backdrop { background:rgba(0,0,0,.72); }
+dialog p, dialog li { font-family:system-ui,sans-serif; color:#c7d0cb; }
+dialog #approve { margin-top:12px; }

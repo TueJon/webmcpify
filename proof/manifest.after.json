@@ -1,0 +1,58 @@
+{
+  "webmcpify": 3,
+  "app": {
+    "stack": "static-es-modules",
+    "typescript": false,
+    "entry": "proof/demo/index.html",
+    "baseUrl": "http://127.0.0.1:<ephemeral>",
+    "startCommand": "npm run proof:verify",
+    "authFixtures": {}
+  },
+  "pipeline": {
+    "phase": "done",
+    "setup": {
+      "runtimeVendored": ["skills/webmcpify/templates/webmcpify.js"],
+      "harnessInstalled": ["proof/demo/run.mjs"],
+      "originTrialNoted": ["proof/README.md"]
+    },
+    "baselineSha": "fixture-snapshot",
+    "baselineDirty": [],
+    "commitPolicy": "no-commit",
+    "commitWebmcpifyDir": true,
+    "blockers": []
+  },
+  "areas": [{ "id": "release-notes", "paths": ["proof/demo/app.js"], "status": "inventoried" }],
+  "tools": [{
+    "id": "set_release_filter",
+    "area": "release-notes",
+    "kind": "imperative",
+    "mutating": "client",
+    "priority": 1,
+    "description": "Filters the visible synthetic release notes by category using the page's existing filter path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "category": { "type": "string", "enum": ["all", "feature", "fix"] } },
+      "required": ["category"],
+      "additionalProperties": false
+    },
+    "annotations": { "readOnlyHint": false, "untrustedContentHint": false },
+    "source": ["proof/demo/app.js:applyFilter"],
+    "route": "/",
+    "auth": ["none"],
+    "examples": { "valid": { "category": "fix" }, "invalid": { "category": "private" } },
+    "expect": { "result": "2 release notes visible", "navigation": null, "ui": "only the two synthetic fix notes remain visible" },
+    "cleanup": "execute the same UI path with category=all",
+    "status": "verified",
+    "approval": { "note": "Approved as the only client-only mutation in this safe fixture.", "at": "2026-07-22", "productionSideEffect": null },
+    "attempts": 0,
+    "batchCommit": null,
+    "notes": "Chrome 150 native getTools/executeTool: schema, annotations, valid result, UI delta, cleanup, and bounded ERROR response for an invalid enum verified."
+  }],
+  "log": [
+    "2026-07-22 inventory: release-notes area complete; one non-overlapping client-only candidate",
+    "2026-07-22 gate: set_release_filter approved; no-commit fixture policy",
+    "2026-07-22 integrate: one tool module wired to existing applyFilter path",
+    "2026-07-22 verify: native Chrome production surface passed",
+    "2026-07-22 audit: every conceptual diff hunk maps to set_release_filter or recorded setup"
+  ]
+}
