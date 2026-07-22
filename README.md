@@ -2,6 +2,8 @@
 
 **Make any web app agent-ready — verifiably.**
 
+🌐 **[webmcpify.at](https://webmcpify.at)** ([Deutsch](https://webmcpify.at/de/)) — the site itself is webmcpified: open it with a WebMCP-enabled agent and call its tools.
+
 webmcpify is an agent skill that integrates [WebMCP](https://webmachinelearning.github.io/webmcp/)
 (`document.modelContext` — a proposed web standard incubated in the W3C Web Machine
 Learning Community Group, currently in Chrome origin trial) into an **existing**
@@ -127,6 +129,7 @@ source of current best practices at integration time.
 
 ## Related projects
 
+- [webmcpify.at](https://webmcpify.at) — project website (itself agent-ready: registers `get_install_command`, `get_pipeline_overview`, `get_faq`, `set_language` via the vendored runtime)
 - [webmachinelearning/webmcp](https://github.com/webmachinelearning/webmcp) — the spec draft (W3C WebML CG)
 - [GoogleChromeLabs/webmcp-tools](https://github.com/GoogleChromeLabs/webmcp-tools) — Google's demos, types, and evals CLI (webmcpify follows these patterns)
 - [GoogleChrome/modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance) — official best-practice guides (webmcpify pulls its WebMCP guides live)
