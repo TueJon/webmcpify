@@ -2,7 +2,7 @@
 
 **Make any web app agent-ready — verifiably.**
 
-🌐 **[webmcpify.at](https://webmcpify.at)** ([Deutsch](https://webmcpify.at/de/)) — the site itself is webmcpified: open it with a WebMCP-enabled agent and call its tools.
+🌐 **[webmcpify.at](https://webmcpify.at)** — the site itself is webmcpified: open it with a WebMCP-enabled agent and call its tools.
 
 webmcpify is an agent skill that integrates [WebMCP](https://webmachinelearning.github.io/webmcp/)
 (`document.modelContext` — a proposed web standard incubated in the W3C Web Machine
