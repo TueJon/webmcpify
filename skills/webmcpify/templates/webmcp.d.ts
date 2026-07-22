@@ -25,10 +25,10 @@
  *
  * Full text: https://github.com/TueJon/webmcpify/blob/main/LICENSE
  *
- * registerTool/ontoolchange/annotations follow the CG draft
- * (https://webmachinelearning.github.io/webmcp/); getTools/executeTool are
- * Chrome-only extensions not yet in the draft. This API is in flux — re-check
- * against the draft and https://developer.chrome.com/docs/ai/webmcp when updating.
+ * registerTool/ontoolchange/annotations/getTools follow the CG draft
+ * (https://webmachinelearning.github.io/webmcp/); executeTool is a Chrome-only
+ * extension not yet in the draft. This API is in flux — re-check against the
+ * draft and https://developer.chrome.com/docs/ai/webmcp when updating.
  *
  * This is a GLOBAL script file — no imports (an import would turn it into a
  * module and un-globalize every interface). React JSX typings for the declarative
@@ -47,11 +47,14 @@ interface ModelContext extends EventTarget {
   ): Promise<void>;
   ontoolchange: ((this: ModelContext, ev: Event) => unknown) | null;
   /**
-   * Enumeration/execution surface — Chrome-only (2026-07+; NOT in the CG draft;
-   * replaced the removed navigator.modelContextTesting). For agents and test
-   * harnesses — never for application logic.
+   * Enumerates tools exposed to this document. Added to the CG draft in 2026-07;
+   * intended for in-page agents and test harnesses, not application logic.
    */
-  getTools?(options?: { fromOrigins?: string[] }): Promise<RegisteredTool[]>;
+  getTools(options?: { fromOrigins?: string[] }): Promise<RegisteredTool[]>;
+  /**
+   * Chrome-only execution surface (2026-07+; not yet in the CG draft); replaced
+   * the removed navigator.modelContextTesting API.
+   */
   executeTool?(
     tool: RegisteredTool,
     inputJson: string,
@@ -81,13 +84,14 @@ interface ModelContextTool {
 /** Shape returned by getTools(). NOTE inputSchema is a STRINGIFIED JSON Schema. */
 interface RegisteredTool {
   name: string;
-  description?: string;
+  title?: string;
+  description: string;
   inputSchema?: string;
   annotations?: ModelContextToolAnnotations;
   /** Registering origin (secure origins only). */
-  origin?: string;
+  origin: string;
   /** Owning window (cross-document enumeration). */
-  window?: Window | null;
+  window: Window;
 }
 
 interface Document {
