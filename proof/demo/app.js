@@ -31,7 +31,10 @@ window.proof = {
   line(text) { log.textContent += `${text}\n`; log.scrollTop = log.scrollHeight; },
   manifest(show = true) { document.querySelector('#manifest').hidden = !show; },
   gate() { document.querySelector('#gate').showModal(); },
-  check(text) { document.querySelector('#checks').insertAdjacentHTML('beforeend', `<div class="check">✓ ${text}</div>`); },
+  check(text) {
+    document.querySelector('#checks').insertAdjacentHTML('beforeend', `<div class="check">✓ ${text}</div>`);
+    log.scrollTop = log.scrollHeight;
+  },
   chrome(version) { document.querySelector('#chrome').textContent = `Chrome ${version} · native document.modelContext`; },
 };
 
