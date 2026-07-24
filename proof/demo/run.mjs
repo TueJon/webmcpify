@@ -102,7 +102,10 @@ try {
   }
 
   await page.waitForFunction(async () => (await document.modelContext.getTools()).some((tool) => tool.name === 'set_release_filter'));
-  await page.evaluate(() => window.proof.phase('verify', 'Verify through native Chrome'));
+  await page.evaluate(() => {
+    window.proof.phase('verify', 'Verify through native Chrome');
+    window.proof.manifest(false);
+  });
   const tool = await page.evaluate(async () => (await document.modelContext.getTools()).find((item) => item.name === 'set_release_filter'));
   assert(tool);
   assert.equal(tool.annotations.readOnlyHint, false);

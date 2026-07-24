@@ -21,10 +21,10 @@ button[aria-pressed="true"], #approve { color:var(--bg); background:var(--green)
 article { display:flex; justify-content:space-between; padding:15px 2px; border-bottom:1px solid var(--line); font-family:system-ui,sans-serif; }
 article small { color:var(--muted); }
 #visible-count { color:var(--green); font-size:14px; }
-#manifest { padding:18px; border:1px solid var(--amber); background:#101412; }
+#manifest { flex-shrink:0; padding:18px; border:1px solid var(--amber); background:#101412; }
 #manifest span { float:right; color:var(--muted); font-size:13px; }
 #manifest p { margin:.65em 0 0; color:var(--muted); font-size:14px; }
-#checks { margin-top:20px; }
+#checks { flex-shrink:0; margin-top:20px; }
 .check { margin:8px 0; color:var(--green); }
 pre { flex:1; min-height:0; margin-top:20px; padding:16px; overflow:hidden; white-space:pre-wrap; color:#cdd7d2; background:#090c0b; border:1px solid #27302d; font-size:13px; line-height:1.55; }
 dialog { width:620px; color:var(--ink); background:#171e1b; border:2px solid var(--amber); box-shadow:0 24px 90px #000; padding:30px; }
