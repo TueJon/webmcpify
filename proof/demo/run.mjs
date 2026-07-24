@@ -39,7 +39,7 @@ try {
   await mkdir(artifacts, { recursive: true });
   browser = await chromium.launch({
     headless: false,
-    executablePath: '/usr/bin/google-chrome',
+    ...(process.env.CHROME_BIN ? { executablePath: process.env.CHROME_BIN } : { channel: 'chrome' }),
     args: ['--enable-features=WebMCP,WebMCPTesting', '--disable-background-networking'],
   });
   const context = await browser.newContext({
@@ -106,6 +106,7 @@ try {
   const tool = await page.evaluate(async () => (await document.modelContext.getTools()).find((item) => item.name === 'set_release_filter'));
   assert(tool);
   assert.equal(tool.annotations.readOnlyHint, false);
+  assert.equal(tool.annotations.untrustedContentHint, false);
   assert.deepEqual(JSON.parse(tool.inputSchema), {
     type: 'object',
     properties: { category: { type: 'string', enum: ['all', 'feature', 'fix'] } },

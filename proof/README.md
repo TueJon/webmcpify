@@ -7,8 +7,12 @@ buttons.
 
 ## Reproduce the verification
 
-Requirements: Node 20+, dependencies from `npm ci`, Google Chrome with the WebMCP
-testing feature, `xvfb-run`, and (for the derivative) ffmpeg.
+Requirements: Node 20+, dependencies from `npm ci`, Google Chrome 150+ (earlier
+releases do not expose the native `document.modelContext` surface and the run
+fails its first assertion), `xvfb-run`, and (for the derivative) ffmpeg. Chrome
+is located through Playwright's `chrome` channel; set `CHROME_BIN` to point at a
+specific binary. On a desktop session you can skip Xvfb and run
+`node proof/demo/run.mjs --verify` directly.
 
 ```sh
 npm ci
@@ -26,7 +30,7 @@ tool exists before approval/integration, triggers the bounded integration, then:
 5. confirms an invalid enum resolves the runtime's bounded `ERROR:` convention
    without changing UI state.
 
-## Reproduce the 72-second uncut recording
+## Reproduce the 63-second uncut recording
 
 ```sh
 npm run proof:record
