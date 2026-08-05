@@ -1,4 +1,4 @@
-# webmcpify
+# webmcpify — the WebMCP agent skill
 
 **Make any web app agent-ready — verifiably.**
 
