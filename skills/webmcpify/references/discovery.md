@@ -27,13 +27,20 @@ write `pipeline.discovery` in `.webmcpify/manifest.json` **first**:
 
 ```json
 "discovery": { "at": "2026-08-06", "publishedTools": ["get_faq"],
-               "paths": [".well-known/webmcp.json", "tests/webmcp-manifest.test.ts"] }
+               "paths": [], "complete": false }
 ```
 
-`paths` is what AUDIT maps the new hunks against; `publishedTools` is the exact
-approved subset — publishing a tool that isn't listed there is a disclosure the
-human never agreed to. `discovery: null` (or absent) = not approved: don't write,
-don't update, and flag any manifest file you find as an unmapped hunk.
+`publishedTools` is the exact approved subset — publishing a tool that isn't listed
+there is a disclosure the human never agreed to. `paths` starts empty and gains
+each artifact **as it is written** (that's what AUDIT maps the new hunks against);
+`complete` flips to `true` only when every artifact exists and its drift test
+passes. A record with `complete: false` is unfinished publication — finish it
+before moving on, since a context reset cannot otherwise tell the two apart.
+
+`discovery: null` (or absent) = not approved: don't write, don't update, and flag a
+manifest **this pipeline created or modified** as an unmapped hunk. A manifest that
+already existed at `baselineSha` and that you did not touch is not your hunk —
+mention it in the report if it contradicts the integration, but leave it alone.
 
 ## Rule 1 — the manifest is a mirror, never a source
 
@@ -78,16 +85,20 @@ are `name`, `description`, `version`, `tools[].name`, `tools[].description`;
       alias /srv/app/.well-known/webmcp.json;
       default_type application/json;
       add_header Access-Control-Allow-Origin "*" always;
-      # add_header here CANCELS every inherited add_header — repeat the site's
-      # security headers verbatim or this response ships without them:
+      # Under nginx's default (legacy) semantics an add_header here CANCELS every
+      # inherited one — repeat the site's security headers or this response ships
+      # without them. Under `add_header_inherit merge` (nginx 1.29.3+) they are
+      # inherited instead, and repeating them emits DUPLICATES. Check first.
       add_header Strict-Transport-Security "max-age=31536000" always;
       # …plus CSP / X-Content-Type-Options / any other server-level header.
   }
   ```
 
-  Before adding the location, read the existing server block and copy **every**
-  `add_header` it sets; afterwards `curl -sI` the manifest and one normal page and
-  diff the header sets. Public discovery documents are fetched cross-origin —
+  So: check `nginx -v` and grep the config for `add_header_inherit` before writing
+  the block, read the existing server block, and copy its `add_header` directives
+  only under legacy semantics. Either way, afterwards `curl -sI` the manifest and
+  one normal page and diff the header sets — that catches both the missing and the
+  duplicated case. Public discovery documents are fetched cross-origin —
   `Access-Control-Allow-Origin: *` is appropriate here **because the file is public
   by construction**; never copy that header onto app routes.
 - Advertise it once per page: `<link rel="webmcp" href="/.well-known/webmcp" type="application/json">`

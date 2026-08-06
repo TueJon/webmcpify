@@ -131,9 +131,11 @@ Manifest schema (Webmcpify Manifest v3):
       "originTrialNoted": ["README.md"]
     },
     "discovery": null,             // optional off-page layer (references/discovery.md). Stays null unless
-                                   //   the human approves publishing; then: { "at": "2026-08-06",
-                                   //   "publishedTools": ["get_faq"],   // ids cleared for PUBLIC listing
-                                   //   "paths": [".well-known/webmcp.json", "tests/webmcp-manifest.test.ts"] }
+                                   //   the human approves publishing; then, written BEFORE the first file:
+                                   //   { "at": "2026-08-06",
+                                   //     "publishedTools": ["get_faq"], // ids cleared for PUBLIC listing
+                                   //     "paths": [],                   // artifacts, appended AS each is written ([] = none yet)
+                                   //     "complete": false }            // true only when every artifact exists and the drift test passes
                                    //   Absent in older manifests = null; no migration needed.
     "baselineSha": "abc1234",      // HEAD at pipeline start; null if no git
     "baselineDirty": ["src/wip.ts"], // paths dirty at start — untouchable (ground rule 1)
@@ -269,11 +271,16 @@ README (`originTrialNoted`). Then loop:
 links, `llms.txt`. Off by default: it publishes tool metadata to the open web, so
 it needs its own human approval and only ever lists public, unauthenticated
 tools. Offer it once tools are integrated; build it per `references/discovery.md`.
-Record the approval **before writing any file** in `pipeline.discovery`
-(`at`, `publishedTools`, `paths`) — that's what survives a context reset and what
-lets AUDIT map these hunks. `pipeline.discovery: null` means not approved: never
-create or update a published manifest, and treat any such file you find as an
-unmapped hunk to flag.
+Record the approval **before writing any file** in `pipeline.discovery` (`at`,
+`publishedTools`, `paths: []`, `complete: false`) — that's what survives a context
+reset and what lets AUDIT map these hunks. Append each artifact to `paths` as you
+write it and set `complete: true` only once every artifact exists and its drift
+test passes. **Approved but `complete: false` is unfinished work: finish it before
+leaving INTEGRATE** — otherwise a reset mid-publication looks exactly like a
+finished one. `pipeline.discovery: null` means not approved: never create or update
+a published manifest, and flag one **the pipeline created or modified** since
+`baselineSha` as an unmapped hunk (a pre-existing, untouched manifest is not your
+hunk — leave it alone).
 
 ## Phase 3 — VERIFY (loop)
 
@@ -327,8 +334,9 @@ scope collisions).
    An unmapped hunk → **flag it in the report** with file/line and a suggested
    disposition; never revert anything yourself. A hunk in a `baselineDirty` file
    → untouchable, flag only. Without a `baselineSha`, audit the files named in
-   manifest `source` fields and `pipeline.setup` paths (setup entries recorded as
-   `null` by the v2→v3 migration: fall back to flag-only for those files).
+   manifest `source` fields, `pipeline.setup` paths, and `pipeline.discovery.paths`
+   (setup entries recorded as `null` by the v2→v3 migration: fall back to
+   flag-only for those files).
 2. Finalize `.webmcpify/report.md`: tool coverage per area, skipped/rejected tools
    with reasons, security notes (which mutating tools exist, what guards them,
    any recorded production side effects), how to test manually (flag, DevTools
