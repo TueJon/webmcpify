@@ -105,7 +105,7 @@ Terminal statuses: `verified`, `skipped`, `rejected`.
 - `gate → integrate`: every `discovered` tool is `approved`/`rejected`, and
   `commitPolicy` + `commitWebmcpifyDir` are set.
 - `integrate → verify`: no `approved` tools remain (each `integrated` or terminal),
-  build green.
+  build green, and `pipeline.discovery` is `null` or `complete: true`.
 - `verify → heal`: verify loop visited every `integrated` tool and ≥1 is `failed`
   (none failed → straight to `audit`).
 - `heal → audit`: no tool `failed` and post-heal full re-verify passed.
@@ -136,7 +136,8 @@ Manifest schema (Webmcpify Manifest v3):
                                    //     "publishedTools": ["get_faq"], // ids cleared for PUBLIC listing
                                    //     "paths": [],                   // artifacts, appended AS each is written ([] = none yet)
                                    //     "complete": false }            // true only when every artifact exists and the drift test passes
-                                   //   Absent in older manifests = null; no migration needed.
+                                   //   Absent field = null. A record written before this key existed has no
+                                   //   `complete`: read that as false, re-check the artifacts, persist the flag.
     "baselineSha": "abc1234",      // HEAD at pipeline start; null if no git
     "baselineDirty": ["src/wip.ts"], // paths dirty at start — untouchable (ground rule 1)
     "commitPolicy": null,          // set at the gate: "commit-per-batch" | "no-commit"

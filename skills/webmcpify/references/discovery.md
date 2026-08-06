@@ -34,13 +34,15 @@ write `pipeline.discovery` in `.webmcpify/manifest.json` **first**:
 there is a disclosure the human never agreed to. `paths` starts empty and gains
 each artifact **as it is written** (that's what AUDIT maps the new hunks against);
 `complete` flips to `true` only when every artifact exists and its drift test
-passes. A record with `complete: false` is unfinished publication — finish it
-before moving on, since a context reset cannot otherwise tell the two apart.
+passes. A record with `complete: false` — or one written before the key existed,
+which reads the same — is unfinished publication: finish it before leaving
+INTEGRATE, since a context reset cannot otherwise tell the two apart.
 
 `discovery: null` (or absent) = not approved: don't write, don't update, and flag a
 manifest **this pipeline created or modified** as an unmapped hunk. A manifest that
-already existed at `baselineSha` and that you did not touch is not your hunk —
-mention it in the report if it contradicts the integration, but leave it alone.
+already existed at `baselineSha` and that you did not touch is not your hunk: leave
+the file alone, and note it in the report either way — what it advertises is part of
+the app's agent surface whether or not this run produced it.
 
 ## Rule 1 — the manifest is a mirror, never a source
 
@@ -103,9 +105,11 @@ are `name`, `description`, `version`, `tools[].name`, `tools[].description`;
   by construction**; never copy that header onto app routes.
 - Advertise it once per page: `<link rel="webmcp" href="/.well-known/webmcp" type="application/json">`
   and, where response headers are cheap to set, `Link: </.well-known/webmcp>; rel="webmcp"`.
-  In nginx, an `add_header` inside a `location` **suppresses** server-level ones —
-  repeat the security headers (HSTS, CSP) in any location where you add `Link`,
-  and re-verify them afterwards.
+  The same inheritance question applies to every location where you add `Link`:
+  under nginx's default semantics an `add_header` there **suppresses** the
+  server-level ones (repeat HSTS/CSP), under `add_header_inherit merge` it does not
+  (repeating them duplicates). Check the mode once, apply it everywhere, and diff
+  the headers afterwards.
 - Mention the manifest in `llms.txt` if the site has one.
 
 ## Third-party audits — score the spec, not the scoreboard
