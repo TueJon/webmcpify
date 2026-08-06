@@ -130,6 +130,11 @@ Manifest schema (Webmcpify Manifest v3):
       "harnessInstalled": [".webmcpify/webmcp.spec.ts"],
       "originTrialNoted": ["README.md"]
     },
+    "discovery": null,             // optional off-page layer (references/discovery.md). Stays null unless
+                                   //   the human approves publishing; then: { "at": "2026-08-06",
+                                   //   "publishedTools": ["get_faq"],   // ids cleared for PUBLIC listing
+                                   //   "paths": [".well-known/webmcp.json", "tests/webmcp-manifest.test.ts"] }
+                                   //   Absent in older manifests = null; no migration needed.
     "baselineSha": "abc1234",      // HEAD at pipeline start; null if no git
     "baselineDirty": ["src/wip.ts"], // paths dirty at start — untouchable (ground rule 1)
     "commitPolicy": null,          // set at the gate: "commit-per-batch" | "no-commit"
@@ -264,6 +269,11 @@ README (`originTrialNoted`). Then loop:
 links, `llms.txt`. Off by default: it publishes tool metadata to the open web, so
 it needs its own human approval and only ever lists public, unauthenticated
 tools. Offer it once tools are integrated; build it per `references/discovery.md`.
+Record the approval **before writing any file** in `pipeline.discovery`
+(`at`, `publishedTools`, `paths`) — that's what survives a context reset and what
+lets AUDIT map these hunks. `pipeline.discovery: null` means not approved: never
+create or update a published manifest, and treat any such file you find as an
+unmapped hunk to flag.
 
 ## Phase 3 — VERIFY (loop)
 
@@ -312,7 +322,8 @@ scope collisions).
 1. **Diff audit (flag-only, never auto-revert):** collect the pipeline's changes —
    `git diff <baselineSha>..HEAD` **plus the index and untracked files** under
    `commit-per-batch`, or the working tree + index + untracked under `no-commit`.
-   Every hunk must map to a manifest entry or a recorded `pipeline.setup` path.
+   Every hunk must map to a manifest entry, a recorded `pipeline.setup` path, or
+   a `pipeline.discovery.paths` entry.
    An unmapped hunk → **flag it in the report** with file/line and a suggested
    disposition; never revert anything yourself. A hunk in a `baselineDirty` file
    → untouchable, flag only. Without a `baselineSha`, audit the files named in

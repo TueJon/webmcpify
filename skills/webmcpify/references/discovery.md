@@ -10,14 +10,30 @@ of a default integration.
 
 | Surface | Status | Source |
 |---|---|---|
-| `document.modelContext` / `navigator.modelContext` (imperative) | **Spec** (W3C WebML CG draft, Chrome origin trial) | [webmcp explainer](https://webmachinelearning.github.io/webmcp/) |
-| `toolname`, `tooldescription`, `toolparamdescription`, `toolautosubmit` on `<form>` (declarative) | **Spec** (declarative API explainer, Chrome docs) | [declarative-api-explainer](https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md) |
+| `document.modelContext` (imperative) | **Spec** (W3C WebML CG draft, Chrome origin trial) | [webmcp explainer](https://webmachinelearning.github.io/webmcp/) |
+| `navigator.modelContext` | **Deprecated** compatibility surface from the Chrome 149 trial — probe it as a fallback, never target it | same |
+| `toolname`, `tooldescription`, `toolautosubmit` on the `<form>`; `toolparamdescription` on the form **control** (or enclosing `<fieldset>`) | **Spec** (declarative API explainer, Chrome docs) | [declarative-api-explainer](https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md) |
 | `toolactivated` / `toolcancel` events, `:tool-form-active` / `:tool-submit-active` | **Spec** | Chrome declarative API docs |
 | `/.well-known/webmcp` manifest | **Not specified.** Chrome discussed pre-visit discovery; nothing shipped. De-facto convention pushed by third-party checkers/registries | community |
 | `<link rel="webmcp">`, `Link: </.well-known/webmcp>; rel="webmcp"` | **Not specified** (RFC 8288 is, the `webmcp` relation is not registered) | community |
 | `llms.txt`, `AGENTS.md`, robots.txt AI-bot rules | Conventions, widely read | community |
 
 Never invent attributes to satisfy a checker (see *Third-party audits* below).
+
+## Rule 0 — record the approval before writing anything
+
+The gate is only real if it survives a context reset. Once the human approves,
+write `pipeline.discovery` in `.webmcpify/manifest.json` **first**:
+
+```json
+"discovery": { "at": "2026-08-06", "publishedTools": ["get_faq"],
+               "paths": [".well-known/webmcp.json", "tests/webmcp-manifest.test.ts"] }
+```
+
+`paths` is what AUDIT maps the new hunks against; `publishedTools` is the exact
+approved subset — publishing a tool that isn't listed there is a disclosure the
+human never agreed to. `discovery: null` (or absent) = not approved: don't write,
+don't update, and flag any manifest file you find as an unmapped hunk.
 
 ## Rule 1 — the manifest is a mirror, never a source
 
@@ -62,12 +78,18 @@ are `name`, `description`, `version`, `tools[].name`, `tools[].description`;
       alias /srv/app/.well-known/webmcp.json;
       default_type application/json;
       add_header Access-Control-Allow-Origin "*" always;
+      # add_header here CANCELS every inherited add_header — repeat the site's
+      # security headers verbatim or this response ships without them:
+      add_header Strict-Transport-Security "max-age=31536000" always;
+      # …plus CSP / X-Content-Type-Options / any other server-level header.
   }
   ```
 
-  Public discovery documents are fetched cross-origin — `Access-Control-Allow-Origin: *`
-  is appropriate here **because the file is public by construction**; never copy
-  that header onto app routes.
+  Before adding the location, read the existing server block and copy **every**
+  `add_header` it sets; afterwards `curl -sI` the manifest and one normal page and
+  diff the header sets. Public discovery documents are fetched cross-origin —
+  `Access-Control-Allow-Origin: *` is appropriate here **because the file is public
+  by construction**; never copy that header onto app routes.
 - Advertise it once per page: `<link rel="webmcp" href="/.well-known/webmcp" type="application/json">`
   and, where response headers are cheap to set, `Link: </.well-known/webmcp>; rel="webmcp"`.
   In nginx, an `add_header` inside a `location` **suppresses** server-level ones —
@@ -91,6 +113,14 @@ extension, 2026-08):
   real form the app actually needs, or nothing. **Never add a form, or fake
   markup, to raise a score.**
 
-During HEAL, only failures from *our* verification harness count as failures. A
-third-party audit finding is input for the report, not a defect to chase — quote
-it, classify it (spec / convention / invented), and let the human decide.
+Classify every finding before reacting — **spec / convention / invented**:
+
+- **Spec.** Check it against the explainer or Chrome docs yourself. If it is a real
+  violation of a specified behaviour in *our* integration, the harness has a gap:
+  add the assertion to the spec file, watch it fail, then heal it like any other
+  failure (contract changes still go back to the gate).
+- **Convention.** Report it with the trade-off; publishing is the human's call.
+- **Invented.** Say so in the report, with the source you checked, and stop.
+
+Never let the *score* drive the work: a red check is a question, and the answer is
+sometimes "that check is wrong".

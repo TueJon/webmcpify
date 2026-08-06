@@ -131,6 +131,7 @@ cannot.
 - Chrome's WebMCP audits flag missing `toolname`/`toolparamdescription`/
   `label[for]`/`name` on declarative forms.
 - Third-party inspectors also grade pages with a compliance **score** mixing spec
-  features, conventions, and invented checks (`toolaction`, `window.ai`). Their
-  findings are report input, never verification failures — classify them per
-  `references/discovery.md` before acting on any of them.
+  features, conventions, and invented checks (`toolaction`, `window.ai`). Classify
+  each finding per `references/discovery.md`: a confirmed **spec** violation means
+  the harness is missing an assertion — add it, then heal the failure. Conventions
+  and invented checks are report input only.
