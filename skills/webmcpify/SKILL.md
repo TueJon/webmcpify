@@ -1,8 +1,15 @@
 ---
 name: webmcpify
-description: Make a web app agent-ready — propose a WebMCP tool manifest, integrate, verify in a real browser, heal; unrelated code stays untouched. Use for "webmcpify", "add WebMCP", or "expose app actions to AI agents".
+description: WebMCP agent skill that makes a web app agent-ready — propose a WebMCP tool manifest, integrate, verify in a real browser, heal; unrelated code stays untouched. Use for "webmcpify", "add WebMCP", or "expose app actions to AI agents".
 argument-hint: "[inventory|integrate|verify|status|full] [scope notes]"
 license: MIT
+tags:
+  - webmcp
+  - agent-skill
+  - document.modelContext
+  - browser-agents
+  - web-development
+  - chrome
 ---
 
 # webmcpify — make any web app agent-ready, verifiably

@@ -27,3 +27,15 @@ keep every distribution manifest (`.claude-plugin/`, `.cursor-plugin/`,
 `gemini-extension.json`, `package.json`) at the same version, and re-check API
 claims against https://webmachinelearning.github.io/webmcp/ and
 https://developer.chrome.com/docs/ai/webmcp — the surface is in flux.
+
+Two discoverability constraints, both load-bearing:
+
+- **Keep the phrase "WebMCP agent skill" in the SKILL.md `description`, the
+  `package.json`/`skill.json` descriptions and the README `<h1>`.** `webmcpify` is a
+  coined single token that matches neither `webmcp` nor `agent skill` in search, and
+  these strings are exactly what marketplaces and search engines display. Dropping the
+  phrase is why one directory invented "Antigravity agent skill" and another filed the
+  skill as an "MCP Server".
+- **The SKILL.md frontmatter is plain YAML**: no `: ` inside an unquoted scalar (use an
+  em dash or "that"), or every consumer's parser breaks. The `description` already
+  contains double quotes, so it cannot simply be wrapped in quotes either.
