@@ -112,7 +112,7 @@ Terminal statuses: `verified`, `skipped`, `rejected`.
 - `gate → integrate`: every `discovered` tool is `approved`/`rejected`, and
   `commitPolicy` + `commitWebmcpifyDir` are set.
 - `integrate → verify`: no `approved` tools remain (each `integrated` or terminal),
-  build green.
+  build green, and `pipeline.discovery` is `null` or `complete: true`.
 - `verify → heal`: verify loop visited every `integrated` tool and ≥1 is `failed`
   (none failed → straight to `audit`).
 - `heal → audit`: no tool `failed` and post-heal full re-verify passed.
@@ -137,6 +137,14 @@ Manifest schema (Webmcpify Manifest v3):
       "harnessInstalled": [".webmcpify/webmcp.spec.ts"],
       "originTrialNoted": ["README.md"]
     },
+    "discovery": null,             // optional off-page layer (references/discovery.md). Stays null unless
+                                   //   the human approves publishing; then, written BEFORE the first file:
+                                   //   { "at": "2026-08-06",
+                                   //     "publishedTools": ["get_faq"], // ids cleared for PUBLIC listing
+                                   //     "paths": [],                   // artifacts, appended AS each is written ([] = none yet)
+                                   //     "complete": false }            // true only when every artifact exists and the drift test passes
+                                   //   Absent field = null. A record written before this key existed has no
+                                   //   `complete`: read that as false, re-check the artifacts, persist the flag.
     "baselineSha": "abc1234",      // HEAD at pipeline start; null if no git
     "baselineDirty": ["src/wip.ts"], // paths dirty at start — untouchable (ground rule 1)
     "commitPolicy": null,          // set at the gate: "commit-per-batch" | "no-commit"
@@ -267,6 +275,21 @@ README (`originTrialNoted`). Then loop:
    previous batch commit.
 5. Repeat until no `approved` tools remain.
 
+**Optional discovery layer** — a `/.well-known/webmcp` manifest, `rel="webmcp"`
+links, `llms.txt`. Off by default: it publishes tool metadata to the open web, so
+it needs its own human approval and only ever lists public, unauthenticated
+tools. Offer it once tools are integrated; build it per `references/discovery.md`.
+Record the approval **before writing any file** in `pipeline.discovery` (`at`,
+`publishedTools`, `paths: []`, `complete: false`) — that's what survives a context
+reset and what lets AUDIT map these hunks. Append each artifact to `paths` as you
+write it and set `complete: true` only once every artifact exists and its drift
+test passes. **Approved but `complete: false` is unfinished work: finish it before
+leaving INTEGRATE** — otherwise a reset mid-publication looks exactly like a
+finished one. `pipeline.discovery: null` means not approved: never create or update
+a published manifest, and flag one **the pipeline created or modified** since
+`baselineSha` as an unmapped hunk (a pre-existing, untouched manifest is not your
+hunk — leave it alone).
+
 ## Phase 3 — VERIFY (loop)
 
 Set up once from `templates/webmcp.spec.ts` per `references/verify.md` (real headed
@@ -314,12 +337,14 @@ scope collisions).
 1. **Diff audit (flag-only, never auto-revert):** collect the pipeline's changes —
    `git diff <baselineSha>..HEAD` **plus the index and untracked files** under
    `commit-per-batch`, or the working tree + index + untracked under `no-commit`.
-   Every hunk must map to a manifest entry or a recorded `pipeline.setup` path.
+   Every hunk must map to a manifest entry, a recorded `pipeline.setup` path, or
+   a `pipeline.discovery.paths` entry.
    An unmapped hunk → **flag it in the report** with file/line and a suggested
    disposition; never revert anything yourself. A hunk in a `baselineDirty` file
    → untouchable, flag only. Without a `baselineSha`, audit the files named in
-   manifest `source` fields and `pipeline.setup` paths (setup entries recorded as
-   `null` by the v2→v3 migration: fall back to flag-only for those files).
+   manifest `source` fields, `pipeline.setup` paths, and `pipeline.discovery.paths`
+   (setup entries recorded as `null` by the v2→v3 migration: fall back to
+   flag-only for those files).
 2. Finalize `.webmcpify/report.md`: tool coverage per area, skipped/rejected tools
    with reasons, security notes (which mutating tools exist, what guards them,
    any recorded production side effects), how to test manually (flag, DevTools
@@ -333,4 +358,6 @@ scope collisions).
 - `references/runtime.md` — vendoring + wiring the `templates/` runtime
 - `references/verify.md` — harness setup: flags, surfaces, Playwright/Puppeteer, evals
 - `references/heal.md` — failure taxonomy → fixes
+- `references/discovery.md` — optional off-page discovery (manifest, `rel="webmcp"`,
+  `llms.txt`) + how to read third-party audit scores
 - `references/security.md` — the security checklist (apply before the gate and at audit)

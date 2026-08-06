@@ -48,6 +48,10 @@ form.addEventListener('submit', (e) => {
   navigation (expected). A JSON-LD `{"@type":"Message","text":"…"}` block on the
   target page is best-effort garnish — the mechanism is still under spec debate;
   never make behavior depend on it.
+- Declarative tools need a real `<form>` the app already has. If an area has no
+  form, integrate it imperatively — **never add a form to make declarative
+  markup possible**. Publishing the tool surface off-page (`/.well-known/webmcp`,
+  `rel="webmcp"`) is a separate approval-gated layer: `references/discovery.md`.
 
 ### Framework notes — React
 
