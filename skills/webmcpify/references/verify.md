@@ -130,3 +130,7 @@ cannot.
   Beaufort): natural-language smoke tests of tool *selection*.
 - Chrome's WebMCP audits flag missing `toolname`/`toolparamdescription`/
   `label[for]`/`name` on declarative forms.
+- Third-party inspectors also grade pages with a compliance **score** mixing spec
+  features, conventions, and invented checks (`toolaction`, `window.ai`). Their
+  findings are report input, never verification failures — classify them per
+  `references/discovery.md` before acting on any of them.

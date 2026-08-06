@@ -8,6 +8,12 @@ diff, disable a check, or fake a return value to force a pass. **Mutating
 tools:** run the manifest `cleanup` between attempts — retrying a mutation
 without cleanup duplicates data.
 
+**Only our harness defines a failure.** A low score from a third-party WebMCP
+inspector/checker is not a failed tool: those lists mix spec features with
+conventions and invented checks. Never heal toward one — no `toolaction`
+attributes, no forms added to satisfy a declarative check, no chasing a
+browser-side `window.ai`. Classify and report instead (`references/discovery.md`).
+
 **Heal fixes implementations, not contracts.** The manifest is the
 human-approved contract: if the correct fix would change a tool's `inputSchema`,
 `description`, `mutating` class, `annotations`, or `expect`, take it back to the

@@ -260,6 +260,11 @@ README (`originTrialNoted`). Then loop:
    previous batch commit.
 5. Repeat until no `approved` tools remain.
 
+**Optional discovery layer** — a `/.well-known/webmcp` manifest, `rel="webmcp"`
+links, `llms.txt`. Off by default: it publishes tool metadata to the open web, so
+it needs its own human approval and only ever lists public, unauthenticated
+tools. Offer it once tools are integrated; build it per `references/discovery.md`.
+
 ## Phase 3 — VERIFY (loop)
 
 Set up once from `templates/webmcp.spec.ts` per `references/verify.md` (real headed
@@ -326,4 +331,6 @@ scope collisions).
 - `references/runtime.md` — vendoring + wiring the `templates/` runtime
 - `references/verify.md` — harness setup: flags, surfaces, Playwright/Puppeteer, evals
 - `references/heal.md` — failure taxonomy → fixes
+- `references/discovery.md` — optional off-page discovery (manifest, `rel="webmcp"`,
+  `llms.txt`) + how to read third-party audit scores
 - `references/security.md` — the security checklist (apply before the gate and at audit)
