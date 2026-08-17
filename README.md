@@ -20,19 +20,19 @@ classification), and after your approval integrates the tools, **exercises each 
 in a real browser**, and heals failures — escalating honestly what it can't fix —
 while keeping unrelated logic and UI untouched.
 
-## See the full verification run
+## See native Chrome verification
 
-**[Watch the uncut 63-second Chrome run](proof/artifacts/webmcpify-proof-480p.mp4)** —
-one client-only tool goes from inventory to human approval, integration, native
-`document.modelContext.getTools()` / `executeTool()` verification, a visible UI
-change, invalid-input handling, cleanup, and final audit.
+**[Watch the uncut 63-second runtime demo](proof/artifacts/webmcpify-proof-480p.mp4)** —
+a prepared local fixture passes a real approval click, registers one client-only
+tool, then exercises native `document.modelContext.getTools()` / `executeTool()`
+verification, a visible UI change, invalid-input handling, and cleanup.
 
-Nothing in the recording is staged output. The complete
-[`proof/`](proof/README.md) pack includes the runnable fixture, the
-[manifest before approval](proof/manifest.before.json), the
-[verified manifest](proof/manifest.after.json), the entire
-[integration patch](proof/integration.patch), and artifact checksums. Reproduce it
-with `npm run proof:verify`.
+The runtime registration and browser assertions are real. The phase labels are
+advanced by a deterministic script for legibility; the recording does not execute
+the skill's inventory, integration, or audit phases. The [`proof/`](proof/README.md)
+pack includes the runnable fixture, prepared before/after example manifests, an
+illustrative integration patch, and artifact checksums. Reproduce the native-browser
+checks with `npm run proof:verify`.
 
 ## Why
 
