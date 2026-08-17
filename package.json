@@ -2,6 +2,7 @@
   "name": "webmcpify",
   "displayName": "webmcpify",
   "description": "WebMCP agent skill — make any web app agent-ready, verifiably: inventory, integrate, verify in a real browser, heal.",
+  "type": "module",
   "license": "MIT",
   "version": "0.4.0",
   "publisher": "TueJon",

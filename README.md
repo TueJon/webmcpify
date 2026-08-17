@@ -20,6 +20,20 @@ classification), and after your approval integrates the tools, **exercises each 
 in a real browser**, and heals failures — escalating honestly what it can't fix —
 while keeping unrelated logic and UI untouched.
 
+## See the full verification run
+
+**[Watch the uncut 63-second Chrome run](proof/artifacts/webmcpify-proof-480p.mp4)** —
+one client-only tool goes from inventory to human approval, integration, native
+`document.modelContext.getTools()` / `executeTool()` verification, a visible UI
+change, invalid-input handling, cleanup, and final audit.
+
+Nothing in the recording is staged output. The complete
+[`proof/`](proof/README.md) pack includes the runnable fixture, the
+[manifest before approval](proof/manifest.before.json), the
+[verified manifest](proof/manifest.after.json), the entire
+[integration patch](proof/integration.patch), and artifact checksums. Reproduce it
+with `npm run proof:verify`.
+
 ## Why
 
 Browser AI agents (Gemini in Chrome, extensions, assistive tech) are learning to
@@ -133,6 +147,8 @@ isolates that churn in one vendored file, probes for the current
 enumeration/execution surface, and treats Google's live
 [modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance) as the
 source of current best practices at integration time.
+
+Release-by-release spec adaptations are recorded in the [changelog](CHANGELOG.md).
 
 ## Related projects
 
