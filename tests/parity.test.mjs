@@ -174,14 +174,54 @@ test('createToolScope: happy path — ready resolves true; duplicate key resolve
 
 test('createToolScope: no WebMCP — no-op handle, ready false', async () => {
   const results = [];
-  for (const [, mod] of variants) {
-    setModelContext(undefined);
-    const handle = mod.createToolScope('no-mc', []);
-    results.push({ ready: await handle.ready, callable: typeof handle === 'function' });
-    handle();
+  const warnings = [];
+  const originalWarn = console.warn;
+  console.warn = (message) => warnings.push(String(message));
+  try {
+    for (const [tag, mod] of variants) {
+      setModelContext(undefined);
+      const handle = mod.createToolScope(`no-mc-${tag}`, [], { validate: true });
+      results.push({ ready: await handle.ready, callable: typeof handle === 'function' });
+      handle();
+    }
+  } finally {
+    console.warn = originalWarn;
   }
   assert.deepEqual(results[0], results[1]);
   assert.deepEqual(results[0], { ready: false, callable: true });
+  assert.equal(warnings.length, 2, 'each runtime variant warns once in development');
+  for (const warning of warnings) assert.match(warning, /window\.isSecureContext/);
+});
+
+test('createToolScope: guards bare null and undefined tool results with structured errors', async () => {
+  const results = [];
+  for (const [tag, mod] of variants) {
+    freshWindow();
+    const registered = [];
+    setModelContext({ registerTool: async (tool) => registered.push(tool) });
+    const handle = mod.createToolScope(
+      `result-guard-${tag}`,
+      [
+        { ...validTool('null_tool'), execute: async () => null },
+        { ...validTool('undefined_tool'), execute: async () => undefined },
+        { ...validTool('object_tool'), execute: async () => ({ opened: true }) },
+      ],
+      { validate: false },
+    );
+    assert.equal(await handle.ready, true);
+    results.push({
+      nullResult: await registered[0].execute({}),
+      undefinedResult: await registered[1].execute({}),
+      objectResult: await registered[2].execute({}),
+    });
+    handle();
+  }
+  assert.deepEqual(results[0], results[1]);
+  assert.deepEqual(results[0].objectResult, { opened: true });
+  assert.equal(results[0].nullResult.ok, false);
+  assert.match(results[0].nullResult.error, /returned null/);
+  assert.equal(results[0].undefinedResult.ok, false);
+  assert.match(results[0].undefinedResult.error, /returned undefined/);
 });
 
 test('createToolScope: sync-throwing registerTool — one onError, ready false, key reusable', async () => {

@@ -106,8 +106,33 @@ Key rules:
   awaits the real work, then fires the completion event with the outcome payload
   (`{ ok, message | error }`) — full contract and component example in
   `runtime.md`. A canned success before the work finishes is a false green.
-- Return short strings; errors as `"ERROR: <what and how to fix>"` so the model can
-  self-correct. Cap outputs ~1.5k chars.
+- **Never return bare `null` or `undefined` from an imperative tool.** Current
+  Chrome builds may serialize it ambiguously or destroy the caller's execution
+  context even when the UI action succeeded. Return a JSON-safe structured object
+  such as `{ opened: true, surface: "project-create", route: "/projects/new",
+  prefilled: false }`; short strings remain valid for simple settled reads. Errors
+  may use `{ ok: false, error: "what failed and how to fix it" }` or the runtime's
+  `"ERROR: ..."` convention. Cap serialized outputs around 1.5k characters.
+- **Route-changing imperative tools use deferred navigation.** Validate inputs and
+  construct the structured result first; schedule the app's existing navigation
+  handler and route-scope disposal together in one later event-loop task, then
+  return the result immediately. This lets `executeTool()` receive an unambiguous
+  result before the page destroys its context:
+
+  ```ts
+  execute: async (input) => {
+    const route = validateProjectDraft(input); // throws/returns an error before acting
+    const result = { opened: true, surface: 'project-create', route, prefilled: false };
+    setTimeout(() => {
+      openProjectCreation(route); // the same path the visible UI uses
+      disposeRouteTools();
+    }, 0);
+    return result;
+  }
+  ```
+
+  `null` remains a browser-owned outcome for a navigating **declarative form**;
+  application `execute()` handlers must not manufacture it.
 - Validate strictly in code, loosely in schema — and keep **parity with the
   form's native HTML constraints**: when a tool wraps a form, probe the real
   constraints on a detached clone instead of re-implementing them —

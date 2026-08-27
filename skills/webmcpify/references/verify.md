@@ -2,14 +2,23 @@
 
 ## Environment
 
-- **Current Chrome** (the API moved during the trial — the old
-  `navigator.modelContextTesting` surface was removed 2026-07 in favor of
-  production `document.modelContext.getTools()/executeTool()`).
+- **Current Chrome** (the API moved during the trial; verification probes
+  `document.modelContext`, never `navigator.modelContext`). A fresh container may
+  have no Chrome or virtual display: provision both explicitly and verify their
+  binaries before running. Do not assume `google-chrome` or `xvfb-run` exists.
 - Enable: `chrome://flags/#enable-webmcp-testing`, or launch with
   `--enable-features=WebMCP,WebMCPTesting` (covers both current and older builds).
-- **Headed only** — WebMCP requires a visible tab by design. In CI, run under
-  `xvfb-run`. Headless will never work; don't heal toward it.
-- App running locally via `app.startCommand`, against dev/test data only.
+- **Headed only for this harness** — Chrome 150 exposed no `modelContext` in the
+  measured headless path. Run a real tab under a verified virtual display in CI;
+  don't heal toward headless.
+- Set `WEBMCP_BASE_URL` to the observed verification origin and
+  `WEBMCP_PROFILE_DIR` to a dedicated writable user-data directory. Never pin a
+  checkout-specific `/work/...` path or assumed localhost port in the spec. Chrome
+  can ignore feature switches when another instance owns the same profile.
+- App running via `app.startCommand`, against dev/test data only. If it never
+  boots, capture console errors and failed requests before touching tool code;
+  absolute backend URLs and exact-port CORS allow-lists are common environment
+  failures.
 - Each tool's manifest entry tells you where and how: `route` (navigate there),
   `auth` (sign in with the recorded test fixture; verify under EACH role for
   role-scoped tools), `examples` (what to execute), `expect` (what to assert),
@@ -17,13 +26,12 @@
 
 ## The enumeration/execution surface (probe, don't assume)
 
-In the page context, prefer the production surface and fall back for older builds:
+In the page context, probe the current production surface:
 
 ```js
-const mc = document.modelContext ?? navigator.modelContext;
-const tools = mc?.getTools
-  ? await mc.getTools()
-  : await navigator.modelContextTesting?.listTools();   // removed 2026-07; legacy only
+const mc = document.modelContext;
+if (!window.isSecureContext || !mc) throw new Error('insecure origin or unsupported test environment');
+const tools = await mc.getTools();
 ```
 
 Contract facts that generated assertions MUST respect:
@@ -55,13 +63,11 @@ as the expected property in the actual target Chrome build.
 ## Per-tool checks
 
 1. Registered (poll — registration is async) with the expected name, the (parsed)
-   schema, **and** the manifest `annotations` on the enumerated tool. The legacy
-   `modelContextTesting` fallback cannot enumerate annotations — skip that
-   assertion there and note the gap in the report.
+   schema, **and** the manifest `annotations` on the enumerated tool.
 2. Valid example executes: assert the result per `expect` — `expect.result` as a
-   substring of the resolved string, or `expect.navigation` as the destination
-   when `executeTool` resolves `null` (it navigated) — **and** the `expect.ui`
-   state as a **delta** (capture the relevant state *before* executing; mere
+   substring of the resolved string, plus `expect.navigation` when a declarative
+   submit navigates or an imperative tool defers the app's existing route action —
+   **and** the `expect.ui` state as a **delta** (capture the relevant state *before* executing; mere
    visibility of something already on screen proves nothing). A tool that reports
    success without the UI changing is a **fail** (UI-settled rule). Because
    executions can navigate, restore the manifest `route` in `beforeEach`, not
@@ -99,7 +105,9 @@ export default defineConfig({
   workers: 1,                              // one shared headed Chrome — never parallelize
 });
 EOF
-WEBMCP_SPEC_DIR=<target-repo>/.webmcpify WEBMCP_BASE_URL=http://localhost:5173 \
+WEBMCP_SPEC_DIR=<target-repo>/.webmcpify \
+WEBMCP_BASE_URL=<recorded-app.verificationOrigin> \
+WEBMCP_PROFILE_DIR=<dedicated-writable-profile-dir> \
 NODE_PATH=/tmp/webmcpify-harness/node_modules npx playwright test
 ```
 
@@ -108,6 +116,11 @@ tooling ignores `NODE_PATH`, symlink instead:
 `ln -s /tmp/webmcpify-harness/node_modules <target-repo>/.webmcpify/node_modules`
 (and make sure it isn't committed). Note in the report that verification ran from
 a standalone harness.
+
+For ChatGPT's separate built-in-browser experience—named **Site tools**, with
+account/model availability and page-lifetime behavior—use `references/client.md`.
+Chrome harness success alone does not prove a specific ChatGPT account can use the
+tools.
 
 **Alternative:** Puppeteer ships a first-class experimental WebMCP API
 (https://pptr.dev/guides/webmcp) — prefer it when the target repo already uses

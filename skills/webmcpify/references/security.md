@@ -16,6 +16,13 @@ both directions. Design every tool as if it were a public, authenticated API end
 
 ## Checklist
 
+**Scope vocabulary**
+- [ ] Identity/tenancy/billing exclusions are written literally: no auth/login/
+      session/password/MFA/SSO; no signup/registration/payment/billing/subscription;
+      no tool returning a credential, token, key, JWT, signed URL or cookie.
+      Creating or changing ordinary product objects is not "account creation" and
+      remains eligible.
+
 **Trust boundary**
 - [ ] Every `execute()` calls only code paths the UI already uses — same endpoints,
       same validation, same authz, same rate limits. No new endpoints, no bypasses.
@@ -25,11 +32,10 @@ both directions. Design every tool as if it were a public, authenticated API end
 
 **Human-in-the-loop**
 - [ ] No `toolautosubmit` on any state-changing form.
-- [ ] No destructive/irreversible/payment tools at all in a first integration.
-      If the human explicitly insists later: an in-page manual confirmation the
-      **user** performs, PLUS a server-side two-step (short-lived confirm token).
-      No client-side API exists that can force an agent to confirm — never rely on
-      one.
+- [ ] No payment/billing tool. No tool performs an irreversible destructive delete
+      directly; it may only open the app's existing confirmation UI for the **user**
+      to complete. Where the app uses a server-side two-step/short-lived confirm
+      token, preserve it. No client-side API can force an agent confirmation.
 - [ ] Initiation tools (`start_*_flow`) genuinely only navigate/open — they must
       not pre-execute any part of the mutation, and never carry `readOnlyHint`.
 

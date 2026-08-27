@@ -1,10 +1,10 @@
 {
   "name": "webmcpify",
   "displayName": "webmcpify",
-  "description": "WebMCP agent skill — make any web app agent-ready, verifiably: inventory, integrate, verify in a real browser, heal.",
+  "description": "WebMCP agent skill for curated core coverage or route-by-route parity — inventory an existing web app, integrate approved tools, then verify and heal them in a real browser.",
   "type": "module",
   "license": "MIT",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "TueJon",
   "repository": {
     "url": "https://github.com/TueJon/webmcpify"

@@ -6,6 +6,17 @@ reconstruct them from git history.
 
 ## [Unreleased]
 
+- Added an explicit `curated | parity` coverage choice, policy-backed inventory
+  verdicts, and a required route→tool coverage map (an element census for parity).
+- Made secure context, verification origin, backend origins and CORS assumptions
+  DETECT gates instead of late verification surprises.
+- Guarded imperative tools against bare `null`/`undefined` results and documented
+  deferred route changes after a structured result.
+- Classified failures before retry counting, reset counters after contract changes,
+  and made skips state the impossibility class and evidence.
+- Hardened headed-Chrome verification around environment-provided origins and
+  dedicated profiles, and added dated ChatGPT Site tools guidance.
+
 ## [0.4.0] — 2026-08-17
 
 - Migrated persistent runs to Manifest v3 with explicit auth fixtures, client vs.
