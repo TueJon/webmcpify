@@ -1,6 +1,6 @@
 ---
 name: webmcpify
-description: WebMCP agent skill that makes a web app agent-ready — propose a WebMCP tool manifest, integrate, verify in a real browser, heal; unrelated code stays untouched. Use for "webmcpify", "add WebMCP", or "expose app actions to AI agents".
+description: WebMCP agent skill for curated core coverage or route-by-route parity — inventory an existing web app, integrate approved tools, then verify and heal them in a real browser. Use for "webmcpify", "add WebMCP", or "expose app actions to AI agents".
 argument-hint: "[inventory|integrate|verify|status|full] [scope notes]"
 license: MIT
 tags:
@@ -59,8 +59,11 @@ Any other text is scoping guidance (e.g. "only the checkout area", "read-only to
    `"client"` (browser-local only: prefs, localStorage), or `"server"` (data
    leaves the browser). Server-mutating tools require explicit **per-tool** human
    approval recorded in the manifest; client-mutating tools may be approved as a
-   batch at the gate. Never expose destructive, irreversible, or payment actions
-   in a first integration.
+   batch at the gate. The scope floor is precise: no auth/login/session/password/
+   MFA/SSO; no signup/registration/payment/billing/subscription; no tool returning
+   a credential, token, key, JWT, signed URL, or cookie; and no irreversible delete
+   except by opening the app's own confirmation UI. Creating or changing ordinary
+   product objects is in scope and must not be mistaken for account creation.
 3. **The server is the only trust boundary.** A tool's `execute()` may only call code
    paths the UI already uses (same endpoints, same validation, same auth). Never
    create new endpoints, never bypass existing checks, never put secrets in tools.
@@ -105,10 +108,22 @@ shards) before redispatching any sub-agents. Then continue at `pipeline.phase`,
 the first `pending` area, or the first tool whose status is not terminal.
 Terminal statuses: `verified`, `skipped`, `rejected`.
 
+An inventory verdict is reusable only under the policy that produced it. Before
+honouring an `inventoried` area, compare its `policyFingerprint` with
+`pipeline.inventoryPolicy.fingerprint`. When a named gate is widened or removed,
+mechanically reset every area whose `exclusions` cite that gate to `pending`, clear
+its derived route-coverage entries and unapproved discovered tools, and record the
+invalidation in `log`. A zero-candidate area without usable exclusion provenance is
+also reset. Editing `status` alone is never an invalidation. Approved or integrated
+tools affected by a later policy change return to the human gate.
+
 **Phase transitions** (make the atomic manifest write the moment the condition holds):
 
-- `detect → inventory`: `app` recorded, `baselineSha`/`baselineDirty` captured.
-- `inventory → gate`: no area `pending`, completeness pass has run.
+- `detect → inventory`: `app` recorded, `app.secureContext === true` at the recorded
+  `app.verificationOrigin`, backend/CORS assumptions captured, `coverageTarget` and
+  inventory policy recorded, and `baselineSha`/`baselineDirty` captured.
+- `inventory → gate`: no area `pending`, route coverage is recorded, and the
+  target-specific completeness pass has run.
 - `gate → integrate`: every `discovered` tool is `approved`/`rejected`, and
   `commitPolicy` + `commitWebmcpifyDir` are set.
 - `integrate → verify`: no `approved` tools remain (each `integrated` or terminal),
@@ -118,13 +133,17 @@ Terminal statuses: `verified`, `skipped`, `rejected`.
 - `heal → audit`: no tool `failed` and post-heal full re-verify passed.
 - `audit → done`: every hunk mapped-or-flagged, `report.md` finalized.
 
-Manifest schema (Webmcpify Manifest v3):
+Manifest schema (Webmcpify Manifest v4):
 
 ```jsonc
 {
-  "webmcpify": 3,
+  "webmcpify": 4,
   "app": { "stack": "react-vite", "typescript": true, "entry": "src/main.tsx",
-           "baseUrl": "http://localhost:5173", "startCommand": "npm run dev",
+           "baseUrl": "https://app.example.test", "startCommand": "npm run dev",
+           "verificationOrigin": "https://app.example.test",
+           "secureContext": true,
+           "backendOrigins": ["http://localhost:3000"],
+           "corsAllowlist": ["https://app.example.test"],
            "authFixtures": {                    // how verify OBTAINS each session
              "member": { "obtain": "npm run seed:test-user, then sign in at /login",
                          "account": "member@example.test",
@@ -132,6 +151,17 @@ Manifest schema (Webmcpify Manifest v3):
            } },
   "pipeline": {
     "phase": "inventory",          // detect|inventory|gate|integrate|verify|heal|audit|done — transition rules above
+    "coverageTarget": "parity",     // REQUIRED before inventory: "curated" | "parity"; never silently default
+    "inventoryPolicy": {
+      "revision": 1,
+      "fingerprint": "sha256:<normalized-gates>",
+      "gates": {
+        "identity": "exclude auth/login/session/password/MFA/SSO",
+        "tenancy_billing": "exclude signup/registration/payment/billing/subscription",
+        "credentials": "exclude tools returning credentials/tokens/keys/JWTs/signed URLs/cookies",
+        "irreversible_delete": "only open the app's own confirmation UI"
+      }
+    },
     "setup": {                     // PATHS created/modified per one-time setup step ([] = not done yet)
       "runtimeVendored": ["src/webmcp/webmcpify.ts", "src/webmcp/webmcp.d.ts"],
       "harnessInstalled": [".webmcpify/webmcp.spec.ts"],
@@ -152,7 +182,19 @@ Manifest schema (Webmcpify Manifest v3):
     "blockers": []                 // e.g. "app won't start locally: needs $API_KEY" — surfaced at the gate
   },
   "areas": [
-    { "id": "checkout", "paths": ["src/features/checkout/"], "status": "pending" } // pending|inventoried
+    { "id": "tickets", "paths": ["src/features/tickets/"], "routes": ["/projects/:id/tickets"],
+      "status": "inventoried",      // pending|inventoried
+      "policyFingerprint": "sha256:<normalized-gates>",
+      "exclusions": [{ "gate": "identity", "reason": "login form" }] }
+  ],
+  "routeCoverage": [
+    { "route": "/projects/:id/tickets", "area": "tickets", "auth": ["role:member"],
+      "interactions": [
+        { "element": "New ticket button", "source": "src/features/tickets/List.tsx:42",
+          "tool": "create_ticket", "reason": null },
+        { "element": "Account menu", "source": "src/layout/AccountMenu.tsx:18",
+          "tool": null, "reason": "identity gate: logout/session action" }
+      ] }
   ],
   "tools": [
     {
@@ -171,14 +213,16 @@ Manifest schema (Webmcpify Manifest v3):
                                    // invalid: null ONLY for readOnlyHint tools with no/empty params —
                                    // verify then asserts dual-outcome: rejects OR resolves with no side effect
       "expect": { "result": "created", "navigation": null, "ui": "new row appears in the ticket list" },
-                                   // exactly one of result|navigation: result = substring of the resolved string;
-                                   // navigation = destination URL/pattern when executeTool resolves null (it navigated)
+                                   // result = substring of the serialized structured result;
+                                   // navigation = destination URL/pattern after a declarative submit or deferred imperative route action
       "cleanup": "delete the created ticket via the UI's own delete path (test data only)", // required for mutating:"server", recommended for "client"
       "status": "discovered",      // discovered|approved|rejected*|integrated|verified*|failed|skipped*  (* = terminal)
       "approval": null,            // server-mutating tools, once approved: { "note": "...", "at": "2026-07-12",
                                    //   "productionSideEffect": null } — set only when verification unavoidably
                                    //   causes a real production effect (see VERIFY: production side-effect policy)
-      "attempts": 0,               // heal-fix cycles; the triggering verify failure is attempt 0
+      "contractRevision": 1,
+      "failure": null,             // on failure: { "class": "contract|implementation|environment|external-policy|flaky|client-capacity", "signature": "...", "contractRevision": 1 }
+      "attempts": 0,               // independent retries of this failure signature under this contract revision
       "batchCommit": null,         // sha under commit-per-batch — lands in the manifest one commit LATER
       "notes": ""
     }
@@ -187,14 +231,36 @@ Manifest schema (Webmcpify Manifest v3):
 }
 ```
 
-**v2→v3 migration:** resuming a `"webmcpify": 2` manifest migrates in place on
-first write — `auth` string → array; `setup` booleans → path arrays (`false` →
-`[]`; `true` → recover paths from git/`log`, else `null` = done-but-unrecorded,
-audit treats those files flag-only); `mutating: true` → `"server"`; add
-`annotations` (defaults from the inventory table), `blockers: []`,
-`commitWebmcpifyDir: null`, `expect.navigation: null`; then bump to 3.
+**v2/v3→v4 migration:** first perform the existing v2→v3 conversions (`auth`
+string → array; setup booleans → path arrays; `mutating: true` → `"server"`;
+annotations/blockers/commitWebmcpifyDir/navigation defaults). Then require a
+`coverageTarget` choice, capture the current inventory policy, add the origin/CORS
+fields, `routeCoverage: []`, and tool `contractRevision`/`failure` fields. Existing
+inventoried areas get `policyFingerprint: null` and are reset to `pending`; their
+old zero-candidate verdicts are not trusted. Bump to 4 only after persisting that
+invalidation.
 
 ## Phase 0 — DETECT
+
+**The first browser gate is secure context.** Read only enough startup config to
+boot the app at a candidate verification origin, open it in headed Chrome, and
+evaluate `window.isSecureContext`. Record the exact origin and result. HTTPS and
+loopback origins can qualify; a plain-HTTP non-loopback origin does not. The
+`WebMCPTesting` feature flag does not waive this gate. If false, record the blocker
+and refuse to enter INVENTORY.
+
+Capture the app's absolute backend-origin assumptions and exact CORS allow-list,
+then choose a verification origin compatible with both. If the page never boots,
+save console errors and failed requests before changing any tool code: an absolute
+localhost backend URL or port-pinned CORS rule is an environment failure, not a
+WebMCP integration failure.
+
+Choose `pipeline.coverageTarget` explicitly before inventory: `curated` maps a
+reviewed set of high-value actions; `parity` performs an exhaustive interactive-
+element census per authenticated route. There is no measured universal client
+tool-count ceiling, so do not promise that a large parity toolset is safe merely
+because registration is route-scoped; verification must enumerate each route in
+the target clients actually available.
 
 Identify stack, build + dev-server commands, TypeScript or not, auth model
 (including how verify obtains each test session → `app.authFixtures`), test
@@ -221,12 +287,18 @@ verification will be blocked and this must be surfaced at the gate. Details:
    `"inventoried"`, write the manifest, repeat.
    - **Sub-agent fan-out:** sub-agents never write `manifest.json`. Each writes only
      its own `areas/<id>.tools.json` shard — schema
-     `{ "webmcpifyShard": 3, "area": "<id>", "tools": [ /* full v3 tool entries */ ] }`,
+     `{ "webmcpifyShard": 4, "area": "<id>", "tools": [ /* full v4 tool entries */ ] }`,
      written atomically (tmp + rename). You (the coordinator) merge shards into
      the manifest sequentially, then delete them; on resume, merge existing
      shards FIRST before redispatching (Resume rule).
-3. **Exit:** no `pending` areas remain, plus one completeness pass — walk the app's
-   navigation and ask "is any visible user action missing?"
+3. **Coverage output:** populate `routeCoverage` in both modes. `curated` maps the
+   selected tools and records why deliberately omitted interaction classes were
+   left out. `parity` inventories every interactive element on every authenticated
+   route and maps each to a tool or a written reason. Pay explicit attention to
+   deletes, drag/drop ordering, bulk and multi-select, table sort/columns/pagination/
+   saved filters, invitations, membership and permission writes, settings toggles,
+   and canvas/viewer controls.
+4. **Exit:** no `pending` areas remain, plus the coverage-target completeness pass.
 
 ## GATE — manifest approval (the one main checkpoint)
 
@@ -247,6 +319,11 @@ exchange where possible:
    will unavoidably cause a real production side effect (e.g. a mailer with an
    Origin-allow-listed endpoint), get that approved HERE and record it in the
    tool's `approval.productionSideEffect` — see VERIFY.
+
+If the human changes a scope gate, update `pipeline.inventoryPolicy`, compute its
+new fingerprint, apply the mandatory invalidation rule before presenting the
+manifest again, and show which areas were reopened. Never carry forward a verdict
+without its producing policy.
 
 Apply `references/security.md` to every mutating tool **before** presenting.
 
@@ -293,7 +370,7 @@ hunk — leave it alone).
 ## Phase 3 — VERIFY (loop)
 
 Set up once from `templates/webmcp.spec.ts` per `references/verify.md` (real headed
-Chrome; production `getTools()`/`executeTool()` surface with legacy fallback probe).
+Chrome; current production `document.modelContext.getTools()`/`executeTool()` surface).
 Then loop over every `integrated` tool, using its manifest `route`, `auth`,
 `examples`, `expect`, and `annotations` fields:
 
@@ -303,8 +380,9 @@ Then loop over every `integrated` tool, using its manifest `route`, `auth`,
 - execute the valid example (mutating tools: dev/test data only, then run
   `cleanup`) and one invalid example (`invalid: null` zero-param read tools:
   dual-outcome assertion — see `references/verify.md`);
-- assert on the returned result **and** the resulting UI state per `expect`
-  (a UI **delta**, or `expect.navigation` when execution resolves `null`).
+- assert on the returned structured result **and** the resulting UI state per
+  `expect`; for route actions, assert `expect.navigation` after the deferred
+  app navigation. A bare imperative `null`/`undefined` result is a failure.
 
 Pass → `"verified"`. Fail → `"failed"` + failure note. Role-scoped tools: run the
 loop once per role listed in `auth`, signing in via the matching
@@ -323,10 +401,14 @@ While any tool is `"failed"`: diagnose via `references/heal.md`, fix **only** th
 tool's integration — **implementation-only** fixes; if the fix would change the
 approved contract (schema, description, `mutating` class, `annotations`,
 `expect`), go back to the gate for re-approval instead of silently changing the
-manifest. The triggering verify failure is attempt 0; increment `attempts` per
-fix cycle and re-verify. At `attempts` = 3 → `"skipped"` with a clear blocker
-note (an explicit escalation to the human, not a silent drop). Never widen the
-diff or fake a pass. After healing, re-run verification once for **all** tools
+manifest. Classify the failure before counting it. `attempts` counts only
+independent retries of the same failure signature under the same contract revision;
+environment and shared contract failures do not burn one attempt on every affected
+tool. When the contract changes after re-approval, increment `contractRevision`,
+clear `failure`, and reset `attempts`. At three independent failed retries of an
+unchanged implementation/flaky signature, `"skipped"` requires the failure class,
+signature, and evidence that makes the tool impossible under the current contract.
+Never widen the diff or fake a pass. After healing, re-run verification once for **all** tools
 with status `integrated` or `verified` (healing one tool can break another —
 scope collisions).
 
@@ -345,7 +427,8 @@ scope collisions).
    manifest `source` fields, `pipeline.setup` paths, and `pipeline.discovery.paths`
    (setup entries recorded as `null` by the v2→v3 migration: fall back to
    flag-only for those files).
-2. Finalize `.webmcpify/report.md`: tool coverage per area, skipped/rejected tools
+2. Finalize `.webmcpify/report.md`: the enumerated route→tool map, coverage target,
+   tool coverage per area, skipped/rejected tools
    with reasons, security notes (which mutating tools exist, what guards them,
    any recorded production side effects), how to test manually (flag, DevTools
    WebMCP pane, inspector extension), and every blocker that needs a human.
@@ -361,3 +444,4 @@ scope collisions).
 - `references/discovery.md` — optional off-page discovery (manifest, `rel="webmcp"`,
   `llms.txt`) + how to read third-party audit scores
 - `references/security.md` — the security checklist (apply before the gate and at audit)
+- `references/client.md` — dated ChatGPT Site tools availability and troubleshooting

@@ -30,22 +30,29 @@
  * below show the complete patterns with REAL assertions — generated blocks must
  * assert, never comment out.
  *
- * Requirements: real Chrome, HEADED (WebMCP needs a visible tab — headless will
- * never work; use xvfb-run in CI). Enumeration/execution uses the production
- * document.modelContext.getTools()/executeTool() surface (Chrome 2026-07+), with a
- * probe fallback to the removed navigator.modelContextTesting for older builds.
+ * Requirements: real current Chrome, HEADED (headless exposes no modelContext in
+ * the supported verification path), a virtual display when needed, and a dedicated
+ * user-data directory. Enumeration/execution uses the production
+ * document.modelContext.getTools()/executeTool() surface (Chrome 2026-07+).
  * Alternative harness: Puppeteer's first-class WebMCP API (pptr.dev/guides/webmcp).
  */
 import { chromium, expect, test } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
 
-const BASE_URL = process.env.WEBMCP_BASE_URL ?? 'http://localhost:5173';
+function requiredEnv(name: 'WEBMCP_BASE_URL' | 'WEBMCP_PROFILE_DIR'): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} is required; do not pin a host port or profile path in the spec`);
+  return value;
+}
+
+const BASE_URL = requiredEnv('WEBMCP_BASE_URL');
+const PROFILE_DIR = requiredEnv('WEBMCP_PROFILE_DIR');
 
 let context: BrowserContext;
 let page: Page;
 
 test.beforeAll(async () => {
-  context = await chromium.launchPersistentContext('', {
+  context = await chromium.launchPersistentContext(PROFILE_DIR, {
     channel: 'chrome',
     headless: false,
     args: ['--enable-features=WebMCP,WebMCPTesting'],
@@ -66,11 +73,9 @@ async function listTools(p: Page): Promise<
   }>
 > {
   return p.evaluate(async () => {
-    const mc = (document as any).modelContext ?? (navigator as any).modelContext;
+    const mc = (document as any).modelContext;
     if (mc?.getTools) return mc.getTools();
-    const legacy = (navigator as any).modelContextTesting; // removed 2026-07; older builds only
-    if (legacy?.listTools) return legacy.listTools();
-    throw new Error('No WebMCP enumeration surface — wrong Chrome build or flags');
+    throw new Error('No document.modelContext enumeration surface — insecure origin, headless/wrong Chrome, reused profile, or missing flag');
   });
 }
 
@@ -82,16 +87,14 @@ async function listTools(p: Page): Promise<
 async function executeTool(p: Page, name: string, args: object): Promise<string | null> {
   return p.evaluate(
     async ({ name, args }) => {
-      const mc = (document as any).modelContext ?? (navigator as any).modelContext;
+      const mc = (document as any).modelContext;
       if (mc?.getTools && mc?.executeTool) {
         const tools = await mc.getTools();
         const tool = tools.find((t: { name: string }) => t.name === name);
         if (!tool) throw new Error(`tool ${name} is not registered`);
         return mc.executeTool(tool, JSON.stringify(args));
       }
-      const legacy = (navigator as any).modelContextTesting;
-      if (legacy?.executeTool) return legacy.executeTool(name, JSON.stringify(args));
-      throw new Error('No WebMCP execution surface — wrong Chrome build or flags');
+      throw new Error('No document.modelContext execution surface — insecure origin, headless/wrong Chrome, reused profile, or missing flag');
     },
     { name, args },
   );
@@ -111,22 +114,17 @@ async function waitForTool(p: Page, name: string, timeoutMs = 5000): Promise<boo
   }
 }
 
-/** The modern surface exposes annotations; the legacy fallback does not. */
-async function hasModernSurface(p: Page): Promise<boolean> {
-  return p.evaluate(() => {
-    const mc = (document as any).modelContext ?? (navigator as any).modelContext;
-    return !!mc?.getTools;
-  });
-}
-
-test('WebMCP is available in the test environment', async () => {
+test('verification origin is secure and WebMCP is available', async () => {
   await page.goto(BASE_URL);
-  const available = await page.evaluate(
-    () => !!(document as any).modelContext || !!(navigator as any).modelContext,
-  );
-  expect(available, 'Enable chrome://flags/#enable-webmcp-testing and use current Chrome').toBe(
-    true,
-  );
+  const probe = await page.evaluate(() => ({
+    secureContext: window.isSecureContext,
+    hasDocumentModelContext: !!(document as any).modelContext,
+  }));
+  expect(probe.secureContext, `Verification origin must be secure: ${BASE_URL}`).toBe(true);
+  expect(
+    probe.hasDocumentModelContext,
+    'Use current headed Chrome, a dedicated profile, and enable chrome://flags/#enable-webmcp-testing',
+  ).toBe(true);
 });
 
 // ── Generated per manifest tool ──────────────────────────────────────────────
@@ -147,18 +145,9 @@ test.describe('search_tickets', () => {
     const tool = tools.find((t) => t.name === 'search_tickets')!;
     const schema = JSON.parse(tool.inputSchema ?? '{}'); // stringified → parse first
     expect(schema.required).toContain('query'); // manifest: inputSchema
-    if (await hasModernSurface(page)) {
-      // manifest: annotations — assert exactly what the manifest recorded
-      expect(tool.annotations?.readOnlyHint).toBe(true);
-      expect(tool.annotations?.untrustedContentHint).toBe(true);
-    } else {
-      // Legacy modelContextTesting fallback cannot enumerate annotations —
-      // skip the assertion and record the gap in the report.
-      test.info().annotations.push({
-        type: 'webmcpify',
-        description: 'annotations not enumerable on this Chrome build — assertion skipped',
-      });
-    }
+    // manifest: annotations — assert exactly what the manifest recorded
+    expect(tool.annotations?.readOnlyHint).toBe(true);
+    expect(tool.annotations?.untrustedContentHint).toBe(true);
   });
 
   test('executes the valid example and changes the UI', async () => {
@@ -242,7 +231,7 @@ test.describe('get_page_summary', () => {
     } catch (err) {
       // Rejected: acceptable only as a validation rejection — a missing surface
       // or unregistered tool is a real failure, not a pass.
-      expect(String(err)).not.toMatch(/No WebMCP|is not registered/);
+      expect(String(err)).not.toMatch(/No document\.modelContext|is not registered/);
     }
   });
 });

@@ -4,7 +4,8 @@
 
 🌐 **[webmcpify.at](https://webmcpify.at)** — the site itself is webmcpified: open it with a WebMCP-enabled agent and call its tools.
 
-webmcpify is an agent skill that integrates [WebMCP](https://webmachinelearning.github.io/webmcp/)
+webmcpify is a WebMCP agent skill for **curated core coverage or route-by-route
+parity**. It integrates [WebMCP](https://webmachinelearning.github.io/webmcp/)
 (`document.modelContext` — a proposed web standard incubated in the W3C Web Machine
 Learning Community Group, currently in Chrome origin trial) into an **existing**
 web application — from a static landing page to a large multi-tenant SaaS — end to end:
@@ -14,11 +15,12 @@ DETECT ─▶ INVENTORY ─▶ [you approve the tool manifest] ─▶ INTEGRATE 
              loop                                            loop        loop     loop
 ```
 
-Your coding agent investigates the codebase, proposes a **tool manifest** (every
-user action worth exposing, with names, schemas, examples, and a read-only/mutating
-classification), and after your approval integrates the tools, **exercises each one
-in a real browser**, and heals failures — escalating honestly what it can't fix —
-while keeping unrelated logic and UI untouched.
+Your coding agent investigates the codebase, asks whether you want a curated set of
+high-value actions or an auditable per-route interaction census, then proposes a
+**tool manifest** with names, schemas, examples, coverage reasons, and a read-only/
+mutating classification. After your approval it integrates the tools, **exercises
+each one in a real browser**, and heals failures—while keeping unrelated logic and
+UI untouched.
 
 ## See native Chrome verification
 
@@ -76,6 +78,7 @@ Open your agent in the target repo and pick your scope:
 /webmcpify integrate      # integrate the approved manifest
 /webmcpify verify         # verify + heal what's integrated
 /webmcpify status         # where are we? what's next?
+/webmcpify full parity    # census every interactive element on every authenticated route
 ```
 
 (or in plain words: *"webmcpify this app"*, *"map what tools this app could expose"*)
@@ -95,8 +98,13 @@ Every phase is a **loop over persistent state**, not a one-shot pass:
   deep-reads one area per iteration — a 500-file SaaS is processed area by area,
   never in one context-busting sweep. Sub-agent fan-out writes per-area shard
   files; a single coordinator merges them (no write races).
-- **Tool budgets** keep SaaS toolsets usable: priority waves, an overlap rule
+- **Coverage is explicit:** `curated` produces a reviewed route→tool map for core
+  actions; `parity` produces a per-route element census where every interaction is
+  mapped to a tool or a written reason. A tool count alone is never called 100%.
+- **Tool budgets** keep curated SaaS toolsets usable: priority waves, an overlap rule
   (no two tools matching the same request), and role/tenant coverage tracking.
+  Parity uses route-scoped registration and reports client-capacity gaps instead of
+  claiming an unmeasured universal per-page limit.
 - **Integrate** works in small batches (one area or ≤5 tools), each independently
   built and typechecked — committed per batch only if you opted in.
 - **Verify/Heal** iterate per tool with attempt caps and honest escalation
@@ -108,13 +116,17 @@ Every phase is a **loop over persistent state**, not a one-shot pass:
 - **Unrelated logic and UI stay untouched** — every diff hunk traces to a manifest
   entry; a final audit against the recorded baseline commit enforces it, and files
   that were already dirty when the run started are never modified or reverted.
-- **Read-only first** — mutating tools require your explicit per-tool approval;
-  destructive/payment actions are never exposed.
+- **Read-only first** — server mutations require your explicit per-tool approval.
+  Auth, signup, billing, payment and credential-returning tools stay excluded;
+  irreversible delete actions can only open the app's existing confirmation UI.
 - **Server stays the trust boundary** — tools only call code paths your UI already
   uses; no new endpoints, no bypasses.
 - **Spec-shaped, zero dependencies** — a small MIT runtime is vendored into your
   repo (no npm dependency), everything feature-detected: your app is
   **behaviorally unchanged** in browsers without WebMCP.
+- **No ambiguous imperative results** — the runtime guards accidental bare
+  `null`/`undefined`, and route-changing tools return a structured result before
+  deferring navigation and route-scope disposal.
 - **Exercised, not assumed** — every tool is enumerated and executed in real
   Chrome, asserting on both the tool result and the resulting UI state, from
   examples recorded in the manifest. That includes mutating declarative forms,
@@ -149,6 +161,9 @@ enumeration/execution surface, and treats Google's live
 source of current best practices at integration time.
 
 Release-by-release spec adaptations are recorded in the [changelog](CHANGELOG.md).
+ChatGPT's separate, model/account-gated client surface is documented as
+[Site tools](skills/webmcpify/references/client.md), with dated availability facts
+and a troubleshooting order.
 
 ## Related projects
 

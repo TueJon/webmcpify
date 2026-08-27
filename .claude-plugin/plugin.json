@@ -1,7 +1,7 @@
 {
   "name": "webmcpify",
-  "description": "Make any web app agent-ready, verifiably: an end-to-end pipeline that inventories user actions into a reviewable tool manifest, integrates WebMCP tools, then verifies and heals them in a real browser — with zero unrelated changes.",
-  "version": "0.4.0",
+  "description": "WebMCP agent skill for curated core coverage or route-by-route parity — inventory an existing web app, integrate approved tools, then verify and heal them in a real browser.",
+  "version": "0.5.0",
   "author": {
     "name": "Jonas Tüchler"
   }

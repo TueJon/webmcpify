@@ -40,6 +40,13 @@ interface ModelContextToolAnnotations {
   untrustedContentHint?: boolean;
 }
 
+type ModelContextToolResult =
+  | string
+  | number
+  | boolean
+  | Record<string, unknown>
+  | unknown[];
+
 interface ModelContext extends EventTarget {
   registerTool(
     tool: ModelContextTool,
@@ -77,7 +84,8 @@ interface ModelContextTool {
    * a promise, so a sync implementation still fulfills this type at runtime;
    * declare it async for type fidelity.
    */
-  execute(input: Record<string, unknown>): Promise<unknown>;
+  /** JSON-safe result; bare null/undefined are intentionally excluded. */
+  execute(input: Record<string, unknown>): Promise<ModelContextToolResult>;
   annotations?: ModelContextToolAnnotations;
 }
 

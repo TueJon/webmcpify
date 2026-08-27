@@ -20,6 +20,15 @@ const versions = [
   ['skill.json', read('skill.json').version],
 ];
 
+const descriptions = [
+  ['package.json', read('package.json').description],
+  ['.claude-plugin/plugin.json', read('.claude-plugin/plugin.json').description],
+  ['.claude-plugin/marketplace.json', read('.claude-plugin/marketplace.json').plugins?.[0]?.description],
+  ['.cursor-plugin/plugin.json', read('.cursor-plugin/plugin.json').description],
+  ['gemini-extension.json', read('gemini-extension.json').description],
+  ['skill.json', read('skill.json').description],
+];
+
 test('every distribution manifest defines a version', () => {
   for (const [file, version] of versions) {
     assert.equal(typeof version, 'string', `${file} must define a version string`);
@@ -32,4 +41,14 @@ test('all distribution manifests carry the same version as package.json', () => 
   for (const [file, version] of versions) {
     assert.equal(version, reference, `${file} version must equal package.json's ${reference}`);
   }
+});
+
+test('public distribution descriptions carry the same coverage contract', () => {
+  const [, reference] = descriptions[0];
+  for (const [file, description] of descriptions) {
+    assert.equal(description, reference, `${file} description must equal package.json`);
+  }
+  assert.match(reference, /WebMCP agent skill/);
+  assert.match(reference, /curated core coverage/);
+  assert.match(reference, /route-by-route parity/);
 });

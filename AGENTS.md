@@ -11,9 +11,12 @@ Quick facts:
   (loop) → VERIFY (loop) → HEAL (loop) → AUDIT + report. Invocation modes
   (`inventory` / `integrate` / `verify` / `status` / `full`) run subsets — see
   SKILL.md §Invocation modes.
-- All state persists in `.webmcpify/manifest.json` (Manifest v2) in the target
+- All state persists in `.webmcpify/manifest.json` (Manifest v4) in the target
   repo — resume from it if it exists. Terminal tool statuses: `verified`,
   `skipped`, `rejected`.
+- Coverage is explicit: `curated` produces a reviewed route→tool map; `parity`
+  produces a per-route interactive-element census. Neither mode may infer coverage
+  from a raw tool count.
 - `skills/webmcpify/templates/` contains everything you vendor into target
   projects (runtime TS + JS, ambient types, Playwright spec) — the skill directory
   is self-contained; nothing outside it is needed at run time.
