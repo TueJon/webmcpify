@@ -16,6 +16,9 @@ reconstruct them from git history.
   and made skips state the impossibility class and evidence.
 - Hardened headed-Chrome verification around environment-provided origins and
   dedicated profiles, and added dated ChatGPT Site tools guidance.
+- Split deterministic WebMCP smoke verification from probabilistic tool-selection
+  and journey evals, added trajectory-led failure diagnosis for `webmcp-evals`
+  0.0.4, and dated Puppeteer's Chrome 151+ harness requirement.
 
 ## [0.4.0] — 2026-08-17
 
