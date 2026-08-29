@@ -171,7 +171,7 @@ and a troubleshooting order.
 - [webmachinelearning/webmcp](https://github.com/webmachinelearning/webmcp) — the spec draft (W3C WebML CG)
 - [GoogleChromeLabs/webmcp-tools](https://github.com/GoogleChromeLabs/webmcp-tools) — Google's demos, types, and evals CLI (webmcpify follows these patterns)
 - [GoogleChrome/modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance) — official best-practice guides (webmcpify pulls its WebMCP guides live)
-- [Puppeteer WebMCP](https://pptr.dev/guides/webmcp) — first-class WebMCP automation API (alternative verify harness)
+- [Puppeteer WebMCP](https://pptr.dev/guides/webmcp) — experimental first-class WebMCP automation API (Chrome 151+ as documented 2026-08-29; alternative verify harness)
 - [MCP-B / WebMCP-org](https://github.com/WebMCP-org/npm-packages) — WebMCP ecosystem: polyfill, extension, transports, and dev tooling (webmcpify vendors a minimal runtime instead of adding dependencies)
 
 ## License

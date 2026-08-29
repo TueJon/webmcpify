@@ -124,16 +124,33 @@ tools.
 
 **Alternative:** Puppeteer ships a first-class experimental WebMCP API
 (https://pptr.dev/guides/webmcp) — prefer it when the target repo already uses
-Puppeteer.
+Puppeteer. As documented on 2026-08-29, that `page.webmcp` surface requires
+Chrome 151+ and `--enable-features=WebMCP`; keep this requirement separate from
+the page-context Playwright harness above, which was measured against Chrome 150.
 
-## Tool-selection evals (recommended; mandatory for SaaS-scale toolsets)
+## Agent evals (recommended; mandatory for SaaS-scale toolsets)
 
-Schema-level verification proves tools *work*, not that an LLM *picks* them.
-For apps exposing more than a handful of tools, run Google's **WebMCP Evals CLI**
-(GoogleChromeLabs/webmcp-tools, `evals-cli`): write one eval case per tool from the
-manifest examples ("user says X → expect tool Y with args Z") and run them —
-this catches ambiguous names/descriptions and overlapping tools that Playwright
-cannot.
+Schema-level verification proves tools *work*, not that an LLM *picks* them or
+completes a journey. Keep the layers distinct:
+
+1. Run Google's experimental **WebMCP Evals CLI**
+   (GoogleChromeLabs/webmcp-tools, package `webmcp-evals`) in `smoke` mode first.
+   It replays `expectedCall` entries against the live page without a model or API
+   key, so failures here are deterministic integration failures.
+2. Run model-backed evals with multiple runs. Include at least one direct prompt
+   and one realistic ambiguous prompt per tool, plus ordered or unordered
+   multi-tool cases for each critical journey. Supply the complete route/state
+   tool set so selection is tested against real overlap, not one tool in isolation.
+3. Treat model failures as product evidence about names, descriptions, schemas,
+   outputs, availability, or workflow boundaries. Inspect the HTML/JSON trajectory
+   before changing a contract: `webmcp-evals` 0.0.4 added local Vercel-backend
+   trajectories with per-step text, reasoning, calls, and results; other backends
+   may omit them. Never heal from only `expected`/`actual` when a trajectory is
+   available.
+
+Use `local` for fast schema/selection iteration and `browser` for real exposed
+tools. Evals remain probabilistic evidence; they do not replace the deterministic
+registration, execution, UI-delta, cleanup, and safeguard checks above.
 
 ## Manual QA (tell the human in the report)
 
