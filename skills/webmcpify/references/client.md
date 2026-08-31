@@ -1,6 +1,6 @@
 # ChatGPT client reality — Site tools
 
-Checked 2026-08-27 against the official OpenAI documentation:
+Checked 2026-08-31 against the official OpenAI documentation:
 <https://learn.chatgpt.com/docs/webmcp>. Re-check that page before publishing or
 relying on model/workspace availability; this UI is moving independently of the
 WebMCP draft and Chrome implementation.
@@ -16,6 +16,11 @@ WebMCP draft and Chrome implementation.
   current, and availability still depends on rollout and the current page.
 - The official page says Site tools are unavailable in Enterprise and Edu
   workspaces.
+- ChatGPT's built-in browser currently implements only a subset of WebMCP: it
+  discovers imperative tools registered with JavaScript in the top-level page,
+  not declarative form tools or tools registered inside iframes. This is a
+  client compatibility boundary, not evidence that either broader WebMCP form
+  or frame support is invalid in Chrome.
 - Tools belong to the page that registered them. Closing or navigating away can
   make them unavailable; a client that tears down the page between turns cannot
   call that old registration.
@@ -42,6 +47,9 @@ customer report or publishing a claim.
 3. Confirm the account/workspace is eligible; absence on the wrong model can look
    exactly like a broken integration because the assistant falls back to ordinary
    browser interaction.
-4. For the website itself, confirm a secure context and live registration. Use the
+4. Confirm the expected Site tool is registered imperatively in the top-level
+   page. A declarative form or iframe registration may be valid WebMCP but is not
+   currently discoverable as a ChatGPT Site tool.
+5. For the website itself, confirm a secure context and live registration. Use the
    headed-Chrome harness in `verify.md` for developer proof; ChatGPT availability
    and Chrome harness success are separate checks.
