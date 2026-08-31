@@ -19,6 +19,8 @@ reconstruct them from git history.
 - Split deterministic WebMCP smoke verification from probabilistic tool-selection
   and journey evals, added trajectory-led failure diagnosis for `webmcp-evals`
   0.0.4, and dated Puppeteer's Chrome 151+ harness requirement.
+- Documented ChatGPT Site tools' current top-level imperative-only compatibility
+  boundary separately from the broader WebMCP APIs verified in Chrome.
 
 ## [0.4.0] — 2026-08-17
 

@@ -118,9 +118,9 @@ tooling ignores `NODE_PATH`, symlink instead:
 a standalone harness.
 
 For ChatGPT's separate built-in-browser experience—named **Site tools**, with
-account/model availability and page-lifetime behavior—use `references/client.md`.
-Chrome harness success alone does not prove a specific ChatGPT account can use the
-tools.
+account/model availability, a narrower API subset, and page-lifetime behavior—use
+`references/client.md`. Chrome harness success alone does not prove a specific
+ChatGPT account can use every verified tool.
 
 **Alternative:** Puppeteer ships a first-class experimental WebMCP API
 (https://pptr.dev/guides/webmcp) — prefer it when the target repo already uses
