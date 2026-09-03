@@ -92,7 +92,7 @@ as the expected property in the actual target Chrome build.
 
 ## Harness
 
-Instantiate `templates/webmcp.spec.ts` (bundled with this skill) — Playwright,
+Instantiate `templates/webmcp.spec.ts` + `templates/webmcp-compat.js` (bundled, `webmcp.spec.ts` imports `./webmcp-compat.js` for `parseInputSchema`/`normalizeResult`/`isNativeInputSchema` — vendor both together) — Playwright,
 headed persistent Chrome, one describe-block per tool generated from the manifest,
 with real assertions (never commented-out placeholders). Put the generated spec
 next to the repo's existing e2e tests.
