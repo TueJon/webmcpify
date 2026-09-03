@@ -89,7 +89,7 @@ async function listTools(p: Page): Promise<
 async function executeTool(p: Page, name: string, args: object): Promise<string | null> {
   return p.evaluate(
     async ({ name, args }) => {
-      // inline helpers: page.evaluate cannot close over outer imports
+      // inline helpers: page.evaluate cannot close over outer imports — keep in sync with webmcp-compat.js
       const normalizeResult = (r: unknown) => (r == null ? null : typeof r === 'string' ? (r as string) : JSON.stringify(r));
       const mc = (document as any).modelContext;
       if (mc?.getTools) {
@@ -98,7 +98,7 @@ async function executeTool(p: Page, name: string, args: object): Promise<string 
         if (!tool) throw new Error(`tool ${name} is not registered`);
         // Stub tools carry .execute and take the object (headless-stub contract);
         // native RegisteredTools never have .execute.
-        if (tool?.execute) return normalizeResult(await tool.execute(args));
+        if (typeof tool?.execute === 'function') return normalizeResult(await tool.execute(args));
         if (mc.executeTool) {
           // Native contract is JSON-string args — main's behavior, preserved when
           // executeTool is wrapped (provenance/schema heuristics both fail: wrappers
@@ -110,7 +110,7 @@ async function executeTool(p: Page, name: string, args: object): Promise<string 
           try {
             return normalizeResult(await mc.executeTool(tool, JSON.stringify(args)));
           } catch (e) {
-            if (!(e instanceof TypeError)) throw e;
+            if (!(e instanceof TypeError) && (e as any)?.name !== 'TypeError') throw e;
             try {
               return normalizeResult(await mc.executeTool(tool, args));
             } catch {

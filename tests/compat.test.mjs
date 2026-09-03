@@ -27,6 +27,7 @@ function loadTemplateExecuteTool() {
   body = body
     .replace(/\(t: \{ name: string \}\)/g, '(t)')
     .replace(/\(r: unknown\)/g, '(r)')
+    .replace(/\(e as any\)/g, '(e)')
     .replace(/\(document as any\)/g, '(document)')
     .replace(/\(r as string\)/g, '(r)');
   return (name, args, modelContext) =>
