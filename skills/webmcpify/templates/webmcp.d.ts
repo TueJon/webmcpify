@@ -64,7 +64,7 @@ interface ModelContext extends EventTarget {
    */
   executeTool?(
     tool: RegisteredTool,
-    inputJson: string,
+    inputJson: string, // native wire is string; shim discriminates via inputSchema shape — collapse when spec norms object
     options?: { signal?: AbortSignal },
   ): Promise<string | null>;
 }
@@ -89,12 +89,12 @@ interface ModelContextTool {
   annotations?: ModelContextToolAnnotations;
 }
 
-/** Shape returned by getTools(). NOTE inputSchema is a STRINGIFIED JSON Schema. */
+/** Shape returned by getTools(). Native returns STRINGIFIED JSON Schema; stubs may return object — handle both. */
 interface RegisteredTool {
   name: string;
   title?: string;
   description: string;
-  inputSchema?: string;
+  inputSchema?: string | object;
   annotations?: ModelContextToolAnnotations;
   /** Registering origin (secure origins only). */
   origin: string;

@@ -36,10 +36,9 @@ const tools = await mc.getTools();
 
 Contract facts that generated assertions MUST respect:
 
-- Enumerated `inputSchema` is a **stringified** JSON Schema — `JSON.parse` before
-  comparing against the manifest entry.
-- `executeTool(...)` resolves to a **string result, or `null` when the execution
-  navigated** (normal for declarative forms that submit-navigate).
+- Enumerated `inputSchema` may be stringified (Chrome native lag) or object (spec/stub) — `typeof === "string" ? JSON.parse : id` before comparing.
+- `executeTool(...)` resolves to a **JSON string result, or `null` when the execution
+  navigated** — stub may return object; normalize via `typeof` before `toMatch`.
 - Execution and declarative-validation failures **reject the promise** — they do
   not resolve to `"ERROR: ..."`. Only imperative tools following the runtime's
   convention resolve with `"ERROR: ..."` strings. Assert accordingly per tool
@@ -55,6 +54,14 @@ Contract facts that generated assertions MUST respect:
   submit → await the result (full example in the template).
 - These surfaces are for agents/harnesses only — they must never appear in shipped
   application code.
+
+### LLM runner — handle both shapes (the 400 recipe)
+
+When an LLM agent loop consumes `getTools` -> OpenAI-compatible `tools` -> `executeTool`:
+
+- `inputSchema` is stringified on native — do `typeof s === "string" ? JSON.parse(s) : s` before sending `parameters: <object>` to the LLM; otherwise `400 'tools.0.function.parameters must be object'` -> loop 502s.
+- Missing `tools` with `tool_choice:none` surfaces as `tool_use_failed` — don't force `tool_choice`; use `disable_tool_validation: true` only when needed.
+- Result may be stringified JSON (`"{\"ok\":true}"`) on native or object on stub — `typeof r === "string" ? try{JSON.parse(r)}catch{ r } : r` and `resultOk` helpers must handle both.
 
 For **declarative** tools also verify the *synthesized* schema: the form-control →
 schema mapping is only partially specified, so check each annotated control appears

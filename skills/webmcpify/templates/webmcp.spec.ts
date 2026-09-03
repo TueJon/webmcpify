@@ -64,11 +64,11 @@ test.afterAll(async () => {
   await context.close();
 });
 
-/** Enumerate registered tools; inputSchema comes back as a STRING (JSON Schema). */
+/** Enumerate registered tools; native returns STRINGIFIED JSON Schema, stubs may return object — handle both. */
 async function listTools(p: Page): Promise<
   Array<{
     name: string;
-    inputSchema?: string;
+    inputSchema?: string | object;
     annotations?: { readOnlyHint?: boolean; untrustedContentHint?: boolean };
   }>
 > {
@@ -92,7 +92,28 @@ async function executeTool(p: Page, name: string, args: object): Promise<string 
         const tools = await mc.getTools();
         const tool = tools.find((t: { name: string }) => t.name === name);
         if (!tool) throw new Error(`tool ${name} is not registered`);
-        return mc.executeTool(tool, JSON.stringify(args));
+        // ponytail: string vs object discriminated by enumerated inputSchema, TypeError fallback — collapse to object when Chrome aligns with spec (#278/#279)
+        const isNativeString = typeof (tool as any).inputSchema === 'string';
+        const normalize = (r: unknown) => r == null || typeof r === 'string' ? (r as string|null) : JSON.stringify(r);
+        try {
+          const r = await mc.executeTool(tool, isNativeString ? JSON.stringify(args) : (args as any));
+          return normalize(r);
+        } catch (e) {
+          if (e instanceof TypeError) {
+            const r = await mc.executeTool(tool, isNativeString ? (args as any) : JSON.stringify(args));
+            return normalize(r);
+          }
+          throw e;
+        }
+      }
+      // stub fallback (tool object carries .execute)
+      if (mc?.getTools) {
+        const tools = await mc.getTools();
+        const tool: any = tools.find((t: { name: string }) => t.name === name);
+        if (tool?.execute) {
+          const r = await tool.execute(args);
+          return r == null || typeof r === 'string' ? r : JSON.stringify(r);
+        }
       }
       throw new Error('No document.modelContext execution surface — insecure origin, headless/wrong Chrome, reused profile, or missing flag');
     },
@@ -143,7 +164,8 @@ test.describe('search_tickets', () => {
     expect(await waitForTool(page, 'search_tickets')).toBe(true); // async registration — poll
     const tools = await listTools(page);
     const tool = tools.find((t) => t.name === 'search_tickets')!;
-    const schema = JSON.parse(tool.inputSchema ?? '{}'); // stringified → parse first
+    const raw = tool.inputSchema as any;
+    const schema = typeof raw === 'string' ? JSON.parse(raw) : (raw ?? {}); // native stringified, stub object — handle both
     expect(schema.required).toContain('query'); // manifest: inputSchema
     // manifest: annotations — assert exactly what the manifest recorded
     expect(tool.annotations?.readOnlyHint).toBe(true);
