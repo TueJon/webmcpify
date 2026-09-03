@@ -38,8 +38,8 @@
  */
 import { chromium, expect, test } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
-// @ts-ignore — shared JS helper, types via JSDoc
-import { isNativeInputSchema, normalizeResult, parseInputSchema } from './webmcp-compat.js';
+// @ts-ignore — shared JS helper for Node-side parsing (browser helpers inlined inside page.evaluate)
+import { parseInputSchema } from './webmcp-compat.js';
 
 function requiredEnv(name: 'WEBMCP_BASE_URL' | 'WEBMCP_PROFILE_DIR'): string {
   const value = process.env[name]?.trim();
@@ -89,6 +89,9 @@ async function listTools(p: Page): Promise<
 async function executeTool(p: Page, name: string, args: object): Promise<string | null> {
   return p.evaluate(
     async ({ name, args }) => {
+      // inline helpers: page.evaluate cannot close over outer imports
+      const isNativeInputSchema = (tool: any) => typeof tool?.inputSchema === 'string';
+      const normalizeResult = (r: unknown) => (r == null || typeof r === 'string' ? (r as string | null) : JSON.stringify(r));
       const mc = (document as any).modelContext;
       if (mc?.getTools && mc?.executeTool) {
         const tools = await mc.getTools();

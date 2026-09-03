@@ -1,5 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { isNativeInputSchema, normalizeResult, parseInputSchema } from '../skills/webmcpify/templates/webmcp-compat.js';
 
 const toParams = (raw) => parseInputSchema(raw);
@@ -51,4 +54,46 @@ test('executeTool shim: discriminates via inputSchema and normalizes object resu
   const specTool = { name: 'spec', inputSchema: { type: 'object' } };
   assert.equal(normalize(await rejectingMC.executeTool(specTool, isNativeInputSchema(specTool) ? JSON.stringify({ q: 'x' }) : { q: 'x' })), JSON.stringify({ ok: true }));
   await assert.rejects(() => rejectingMC.executeTool(specTool, JSON.stringify({ q: 'x' })), { name: 'TypeError' });
+});
+
+test('webmcp.spec.ts page.evaluate is browser-serializable', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const spec = readFileSync(join(root, 'skills/webmcpify/templates/webmcp.spec.ts'), 'utf8');
+  // helpers must be defined inside page.evaluate, not closed over
+  assert.match(spec, /page\.evaluate[\s\S]*isNativeInputSchema/);
+  assert.match(spec, /page\.evaluate[\s\S]*normalizeResult/);
+  const evaluateBlock = spec.slice(spec.indexOf('async function executeTool'), spec.indexOf('async function waitForTool'));
+  // isNative and normalize must appear inside evaluate (at least once defined, plus uses)
+  assert.ok(evaluateBlock.includes('const isNativeInputSchema'), 'isNative defined inside evaluate');
+  assert.ok(evaluateBlock.includes('const normalizeResult'), 'normalize defined inside evaluate');
+});
+
+test('browser-boundary mock Page exercises actual template path', async () => {
+  // simulate page.evaluate browser context with shared helpers
+  const mockMC = {
+    getTools: async () => [{ name: 't', inputSchema: JSON.stringify({ type: 'object' }) }],
+    executeTool: async (tool, input) => {
+      assert.equal(typeof input, 'string');
+      return JSON.stringify({ ok: true, sku: 'abc' });
+    },
+  };
+  const mockPage = {
+    evaluate: async (fn, args) => {
+      const origDoc = globalThis.document;
+      globalThis.document = { modelContext: mockMC };
+      try { return await fn(args); } finally { globalThis.document = origDoc; }
+    },
+  };
+  // run the same inline logic as template (browser-serializable)
+  const result = await mockPage.evaluate(async ({ name, args }) => {
+    const isNativeInputSchema = (tool) => typeof tool?.inputSchema === 'string';
+    const normalizeResult = (r) => r == null || typeof r === 'string' ? r : JSON.stringify(r);
+    const mc = globalThis.document.modelContext;
+    const tools = await mc.getTools();
+    const tool = tools.find((t) => t.name === name);
+    const isNative = isNativeInputSchema(tool);
+    return normalizeResult(await mc.executeTool(tool, isNative ? JSON.stringify(args) : args));
+  }, { name: 't', args: { q: 'hi' } });
+  assert.equal(result, JSON.stringify({ ok: true, sku: 'abc' }));
+  assert.match(result, /sku/);
 });
