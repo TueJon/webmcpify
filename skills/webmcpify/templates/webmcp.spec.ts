@@ -38,6 +38,8 @@
  */
 import { chromium, expect, test } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
+// @ts-ignore — shared JS helper, types via JSDoc
+import { isNativeInputSchema, normalizeResult, parseInputSchema } from './webmcp-compat.js';
 
 function requiredEnv(name: 'WEBMCP_BASE_URL' | 'WEBMCP_PROFILE_DIR'): string {
   const value = process.env[name]?.trim();
@@ -92,19 +94,15 @@ async function executeTool(p: Page, name: string, args: object): Promise<string 
         const tools = await mc.getTools();
         const tool = tools.find((t: { name: string }) => t.name === name);
         if (!tool) throw new Error(`tool ${name} is not registered`);
-        const isNative = typeof tool.inputSchema === 'string';
-        const normalize = (r: unknown) => r == null || typeof r === 'string' ? (r as string|null) : JSON.stringify(r);
-        if (isNative) return normalize(await mc.executeTool(tool, JSON.stringify(args)));
-        return normalize(await mc.executeTool(tool, args));
+        const isNative = isNativeInputSchema(tool as any);
+        if (isNative) return normalizeResult(await mc.executeTool(tool, JSON.stringify(args))) as string | null;
+        return normalizeResult(await mc.executeTool(tool, args as any)) as string | null;
       }
       // stub fallback (tool object carries .execute)
       if (mc?.getTools) {
         const tools = await mc.getTools();
         const tool: any = tools.find((t: { name: string }) => t.name === name);
-        if (tool?.execute) {
-          const r = await tool.execute(args);
-          return r == null || typeof r === 'string' ? r : JSON.stringify(r);
-        }
+        if (tool?.execute) return normalizeResult(await tool.execute(args)) as string | null;
       }
       throw new Error('No document.modelContext execution surface — insecure origin, headless/wrong Chrome, reused profile, or missing flag');
     },
@@ -155,8 +153,7 @@ test.describe('search_tickets', () => {
     expect(await waitForTool(page, 'search_tickets')).toBe(true); // async registration — poll
     const tools = await listTools(page);
     const tool = tools.find((t) => t.name === 'search_tickets')!;
-    const raw = tool.inputSchema as any;
-    const schema = typeof raw === 'string' ? JSON.parse(raw) : (raw ?? {}); // native stringified, stub object — handle both
+    const schema = parseInputSchema(tool.inputSchema as any); // handles string, object, or undefined
     expect(schema.required).toContain('query'); // manifest: inputSchema
     // manifest: annotations — assert exactly what the manifest recorded
     expect(tool.annotations?.readOnlyHint).toBe(true);

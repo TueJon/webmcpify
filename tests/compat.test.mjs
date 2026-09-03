@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { isNativeInputSchema, normalizeResult, parseInputSchema } from '../skills/webmcpify/templates/webmcp-compat.js';
 
-const toParams = (raw) => typeof raw === 'string' ? JSON.parse(raw) : raw ?? { type: 'object', properties: {} };
-const normalize = (r) => r == null || typeof r === 'string' ? r : JSON.stringify(r);
+const toParams = (raw) => parseInputSchema(raw);
+const normalize = (r) => normalizeResult(r);
 
 test('LLM envelope: string|object|undefined inputSchema → object parameters', () => {
   assert.deepEqual(toParams(JSON.stringify({ type: 'object', properties: { q: { type: 'string' } }, required: ['q'] })), { type: 'object', properties: { q: { type: 'string' } }, required: ['q'] });
@@ -29,7 +30,7 @@ test('executeTool shim: discriminates via inputSchema and normalizes object resu
   };
   const invoke = async (name, args) => {
     const tool = (await mockMC.getTools()).find((t) => t.name === name);
-    const isNative = typeof tool.inputSchema === 'string';
+    const isNative = isNativeInputSchema(tool);
     const r = await mockMC.executeTool(tool, isNative ? JSON.stringify(args) : args);
     return normalize(r);
   };
@@ -40,4 +41,14 @@ test('executeTool shim: discriminates via inputSchema and normalizes object resu
   assert.equal(normalize(await stubTool.execute({ q: 'hi' })), JSON.stringify({ ok: true, echo: 'hi' }));
   assert.equal(normalize('already-string'), 'already-string');
   assert.equal(normalize(null), null);
+  // spec stub rejects string input with TypeError — discriminator prevents wrong shape
+  const rejectingMC = {
+    executeTool: async (tool, input) => {
+      if (typeof input === 'string') throw new TypeError('inputObject must be an object');
+      return { ok: true };
+    },
+  };
+  const specTool = { name: 'spec', inputSchema: { type: 'object' } };
+  assert.equal(normalize(await rejectingMC.executeTool(specTool, isNativeInputSchema(specTool) ? JSON.stringify({ q: 'x' }) : { q: 'x' })), JSON.stringify({ ok: true }));
+  await assert.rejects(() => rejectingMC.executeTool(specTool, JSON.stringify({ q: 'x' })), { name: 'TypeError' });
 });
