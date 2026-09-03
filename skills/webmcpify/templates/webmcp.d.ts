@@ -64,7 +64,7 @@ interface ModelContext extends EventTarget {
    */
   executeTool?(
     tool: RegisteredTool,
-    inputJson: string | object, // native string, spec object — shim via inputSchema shape; collapse when spec norms
+    inputJson: string | object, // native string (even with omitted inputSchema), spec object — shim probes [native code] capability; collapse when spec norms
     options?: { signal?: AbortSignal },
   ): Promise<ModelContextToolResult | null>;
 }

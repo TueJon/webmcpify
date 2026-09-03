@@ -90,14 +90,17 @@ async function executeTool(p: Page, name: string, args: object): Promise<string 
   return p.evaluate(
     async ({ name, args }) => {
       // inline helpers: page.evaluate cannot close over outer imports
-      const isNativeInputSchema = (tool: any) => typeof tool?.inputSchema === 'string';
+      // native WebIDL executeTool stringifies as [native code]; JS stubs/polyfills show source.
+      // Works for present AND omitted inputSchema (native zero-param tools still need JSON-string args).
+      const isNativeExecuteTool = (mc: any) =>
+        typeof mc?.executeTool === 'function' && /\[native code\]/.test(mc.executeTool.toString());
       const normalizeResult = (r: unknown) => (r == null ? null : typeof r === 'string' ? (r as string) : JSON.stringify(r));
       const mc = (document as any).modelContext;
       if (mc?.getTools && mc?.executeTool) {
         const tools = await mc.getTools();
         const tool = tools.find((t: { name: string }) => t.name === name);
         if (!tool) throw new Error(`tool ${name} is not registered`);
-        const isNative = isNativeInputSchema(tool);
+        const isNative = isNativeExecuteTool(mc);
         if (isNative) return normalizeResult(await mc.executeTool(tool, JSON.stringify(args)));
         return normalizeResult(await mc.executeTool(tool, args));
       }

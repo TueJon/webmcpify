@@ -35,8 +35,13 @@ export function parseInputSchema(raw) {
   return typeof raw === 'string' ? JSON.parse(raw) : raw ?? { type: 'object', properties: {} };
 }
 
-export function isNativeInputSchema(tool) {
-  return typeof tool?.inputSchema === 'string';
+/**
+ * Native WebIDL executeTool stringifies as [native code]; JS stubs/polyfills
+ * show source. Stable for present AND omitted inputSchema — native zero-param
+ * tools (no schema) still require JSON-string arguments.
+ */
+export function isNativeExecuteTool(mc) {
+  return typeof mc?.executeTool === 'function' && /\[native code\]/.test(mc.executeTool.toString());
 }
 
 export function normalizeResult(r) {

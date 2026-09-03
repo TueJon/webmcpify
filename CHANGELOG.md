@@ -6,8 +6,9 @@ reconstruct them from git history.
 
 ## [Unreleased]
 
-- Added native/stub I/O compat: the verification shim discriminates stringified
-  vs object `inputSchema` (shape, not exception prose), normalizes stub object
+- Added native/stub I/O compat: the verification shim discriminates native vs stub
+  by capability (`[native code]` probe — valid for present AND omitted `inputSchema`,
+  so native zero-param tools get JSON-string args), normalizes stub object
   results to JSON strings (undefined→null), and ships a shared
   `templates/webmcp-compat.js` helper vendored with the harness; ambient types
   widen `executeTool` input/result to the dual contract, and deterministic
