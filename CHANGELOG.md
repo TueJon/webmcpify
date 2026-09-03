@@ -6,6 +6,12 @@ reconstruct them from git history.
 
 ## [Unreleased]
 
+- Added native/stub I/O compat: the verification shim discriminates stringified
+  vs object `inputSchema` (shape, not exception prose), normalizes stub object
+  results to JSON strings (undefined→null), and ships a shared
+  `templates/webmcp-compat.js` helper vendored with the harness; ambient types
+  widen `executeTool` input/result to the dual contract, and deterministic
+  tests execute the actual template adapter.
 - Added an explicit `curated | parity` coverage choice, policy-backed inventory
   verdicts, and a required route→tool coverage map (an element census for parity).
 - Made secure context, verification origin, backend origins and CORS assumptions

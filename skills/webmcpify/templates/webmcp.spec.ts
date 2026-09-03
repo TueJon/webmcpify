@@ -38,7 +38,7 @@
  */
 import { chromium, expect, test } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
-// @ts-ignore — shared JS helper for Node-side parsing (browser helpers inlined inside page.evaluate)
+// @ts-expect-error — shared JS helper; inlined copies live inside page.evaluate (browser boundary)
 import { parseInputSchema } from './webmcp-compat.js';
 
 function requiredEnv(name: 'WEBMCP_BASE_URL' | 'WEBMCP_PROFILE_DIR'): string {
@@ -91,21 +91,22 @@ async function executeTool(p: Page, name: string, args: object): Promise<string 
     async ({ name, args }) => {
       // inline helpers: page.evaluate cannot close over outer imports
       const isNativeInputSchema = (tool: any) => typeof tool?.inputSchema === 'string';
-      const normalizeResult = (r: unknown) => (r == null || typeof r === 'string' ? (r as string | null) : JSON.stringify(r));
+      const normalizeResult = (r: unknown) => (r == null ? null : typeof r === 'string' ? (r as string) : JSON.stringify(r));
       const mc = (document as any).modelContext;
       if (mc?.getTools && mc?.executeTool) {
         const tools = await mc.getTools();
         const tool = tools.find((t: { name: string }) => t.name === name);
         if (!tool) throw new Error(`tool ${name} is not registered`);
-        const isNative = isNativeInputSchema(tool as any);
-        if (isNative) return normalizeResult(await mc.executeTool(tool, JSON.stringify(args))) as string | null;
-        return normalizeResult(await mc.executeTool(tool, args as any)) as string | null;
+        const isNative = isNativeInputSchema(tool);
+        if (isNative) return normalizeResult(await mc.executeTool(tool, JSON.stringify(args)));
+        return normalizeResult(await mc.executeTool(tool, args));
       }
       // stub fallback (tool object carries .execute)
       if (mc?.getTools) {
         const tools = await mc.getTools();
-        const tool: any = tools.find((t: { name: string }) => t.name === name);
-        if (tool?.execute) return normalizeResult(await tool.execute(args)) as string | null;
+        const tool = tools.find((t: { name: string }) => t.name === name);
+        if (!tool) throw new Error(`tool ${name} is not registered`);
+        if (tool?.execute) return normalizeResult(await tool.execute(args));
       }
       throw new Error('No document.modelContext execution surface — insecure origin, headless/wrong Chrome, reused profile, or missing flag');
     },
@@ -156,7 +157,7 @@ test.describe('search_tickets', () => {
     expect(await waitForTool(page, 'search_tickets')).toBe(true); // async registration — poll
     const tools = await listTools(page);
     const tool = tools.find((t) => t.name === 'search_tickets')!;
-    const schema = parseInputSchema(tool.inputSchema as any); // handles string, object, or undefined
+    const schema = parseInputSchema(tool.inputSchema); // handles string, object, or undefined
     expect(schema.required).toContain('query'); // manifest: inputSchema
     // manifest: annotations — assert exactly what the manifest recorded
     expect(tool.annotations?.readOnlyHint).toBe(true);

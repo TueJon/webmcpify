@@ -36,7 +36,7 @@ const tools = await mc.getTools();
 
 Contract facts that generated assertions MUST respect:
 
-- Enumerated `inputSchema` may be stringified (Chrome native lag) or object (spec/stub) — `typeof === "string" ? JSON.parse : id` before comparing.
+- Enumerated `inputSchema` may be stringified (Chrome native lag) or object (spec/stub) — `typeof === "string" ? JSON.parse(s) : s ?? {type:'object',properties:{}}` before comparing.
 - `executeTool(...)` resolves to a **JSON string result, or `null` when the execution
   navigated** — stub may return object; normalize via `typeof` before `toMatch`.
 - Execution and declarative-validation failures **reject the promise** — they do
@@ -59,7 +59,7 @@ Contract facts that generated assertions MUST respect:
 
 When an LLM agent loop consumes `getTools` -> OpenAI-compatible `tools` -> `executeTool`:
 
-- `inputSchema` is stringified on native — do `typeof s === "string" ? JSON.parse(s) : s` before sending `parameters: <object>` to the LLM; otherwise `400 'tools.0.function.parameters must be object'` -> loop 502s.
+- `inputSchema` is stringified on native — do `typeof s === "string" ? JSON.parse(s) : s ?? {type:'object',properties:{}}` before sending `parameters: <object>` to the LLM; otherwise `400 'tools.0.function.parameters must be object'` -> loop 502s.
 - Missing `tools` with `tool_choice:none` surfaces as `tool_use_failed` — don't force `tool_choice`; use `disable_tool_validation: true` only when needed.
 - Result may be stringified JSON (`"{\"ok\":true}"`) on native or object on stub — `typeof r === "string" ? try{JSON.parse(r)}catch{ r } : r` and `resultOk` helpers must handle both.
 
@@ -92,7 +92,7 @@ as the expected property in the actual target Chrome build.
 
 ## Harness
 
-Instantiate `templates/webmcp.spec.ts` + `templates/webmcp-compat.js` (bundled, `webmcp.spec.ts` imports `./webmcp-compat.js` for `parseInputSchema`/`normalizeResult`/`isNativeInputSchema` — vendor both together) — Playwright,
+Instantiate `templates/webmcp.spec.ts` + `templates/webmcp-compat.js` (bundled with this skill — vendor both together; the spec imports `parseInputSchema` from the helper on the Node side, and carries inlined `isNativeInputSchema`/`normalizeResult` copies inside `page.evaluate` because the browser cannot close over imports) — Playwright,
 headed persistent Chrome, one describe-block per tool generated from the manifest,
 with real assertions (never commented-out placeholders). Put the generated spec
 next to the repo's existing e2e tests.
