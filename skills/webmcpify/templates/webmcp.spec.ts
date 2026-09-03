@@ -92,19 +92,10 @@ async function executeTool(p: Page, name: string, args: object): Promise<string 
         const tools = await mc.getTools();
         const tool = tools.find((t: { name: string }) => t.name === name);
         if (!tool) throw new Error(`tool ${name} is not registered`);
-        // string vs object discriminated by enumerated inputSchema, TypeError fallback — collapse to object when Chrome aligns with spec (#278/#279)
-        const isNativeString = typeof (tool as any).inputSchema === 'string';
+        const isNative = typeof tool.inputSchema === 'string';
         const normalize = (r: unknown) => r == null || typeof r === 'string' ? (r as string|null) : JSON.stringify(r);
-        try {
-          const r = await mc.executeTool(tool, isNativeString ? JSON.stringify(args) : (args as any));
-          return normalize(r);
-        } catch (e) {
-          if (e instanceof TypeError) {
-            const r = await mc.executeTool(tool, isNativeString ? (args as any) : JSON.stringify(args));
-            return normalize(r);
-          }
-          throw e;
-        }
+        if (isNative) return normalize(await mc.executeTool(tool, JSON.stringify(args)));
+        return normalize(await mc.executeTool(tool, args));
       }
       // stub fallback (tool object carries .execute)
       if (mc?.getTools) {
