@@ -92,7 +92,7 @@ async function executeTool(p: Page, name: string, args: object): Promise<string 
         const tools = await mc.getTools();
         const tool = tools.find((t: { name: string }) => t.name === name);
         if (!tool) throw new Error(`tool ${name} is not registered`);
-        // ponytail: string vs object discriminated by enumerated inputSchema, TypeError fallback — collapse to object when Chrome aligns with spec (#278/#279)
+        // string vs object discriminated by enumerated inputSchema, TypeError fallback — collapse to object when Chrome aligns with spec (#278/#279)
         const isNativeString = typeof (tool as any).inputSchema === 'string';
         const normalize = (r: unknown) => r == null || typeof r === 'string' ? (r as string|null) : JSON.stringify(r);
         try {
