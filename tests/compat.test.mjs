@@ -59,13 +59,14 @@ test('executeTool shim: discriminates via inputSchema and normalizes object resu
 test('webmcp.spec.ts page.evaluate is browser-serializable', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const spec = readFileSync(join(root, 'skills/webmcpify/templates/webmcp.spec.ts'), 'utf8');
-  // helpers must be defined inside page.evaluate, not closed over
-  assert.match(spec, /page\.evaluate[\s\S]*isNativeInputSchema/);
-  assert.match(spec, /page\.evaluate[\s\S]*normalizeResult/);
   const evaluateBlock = spec.slice(spec.indexOf('async function executeTool'), spec.indexOf('async function waitForTool'));
-  // isNative and normalize must appear inside evaluate (at least once defined, plus uses)
-  assert.ok(evaluateBlock.includes('const isNativeInputSchema'), 'isNative defined inside evaluate');
-  assert.ok(evaluateBlock.includes('const normalizeResult'), 'normalize defined inside evaluate');
+  // helpers must be defined inside page.evaluate, not closed over outer imports
+  assert.ok(evaluateBlock.includes('const isNativeInputSchema'), 'isNative helper defined inside evaluate');
+  assert.ok(evaluateBlock.includes('const normalizeResult'), 'normalize helper defined inside evaluate');
+  // discriminator must be via isNativeInputSchema, not hardcoded
+  assert.match(evaluateBlock, /const isNative = isNativeInputSchema/);
+  assert.doesNotMatch(evaluateBlock, /const isNative = false/);
+  assert.ok(evaluateBlock.includes('JSON.stringify(args)'), 'stringify used for native');
 });
 
 test('browser-boundary mock Page exercises actual template path', async () => {
@@ -84,10 +85,8 @@ test('browser-boundary mock Page exercises actual template path', async () => {
       try { return await fn(args); } finally { globalThis.document = origDoc; }
     },
   };
-  // run the same inline logic as template (browser-serializable)
+  // exercise actual template path via shared helpers (not a copy) — mock Page runs same discriminator
   const result = await mockPage.evaluate(async ({ name, args }) => {
-    const isNativeInputSchema = (tool) => typeof tool?.inputSchema === 'string';
-    const normalizeResult = (r) => r == null || typeof r === 'string' ? r : JSON.stringify(r);
     const mc = globalThis.document.modelContext;
     const tools = await mc.getTools();
     const tool = tools.find((t) => t.name === name);
