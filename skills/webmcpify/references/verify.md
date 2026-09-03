@@ -41,8 +41,12 @@ Contract facts that generated assertions MUST respect:
   navigated** — stub may return object; normalize via `typeof` before `toMatch`.
 - **Native `executeTool` needs JSON-string arguments even for tools with OMITTED
   `inputSchema`** (zero-param): `executeTool(tool, '{}')`, not `executeTool(tool, {})`.
-  The harness discriminates native vs stub by capability (`[native code]`), never by
-  schema shape or exception prose.
+  The harness sends the string first — preserved when `executeTool` is wrapped for
+  instrumentation — and retries once with the object only on a `TypeError`-class
+  rejection, the spec-stub signature; if the retry also fails, the original error
+  surfaces. Stub tools carrying their own `.execute` are called with the object
+  directly. No schema-shape or function-source heuristics: both fail (native
+  zero-param tools omit the schema; wrappers stringify as JS source).
 - Execution and declarative-validation failures **reject the promise** — they do
   not resolve to `"ERROR: ..."`. Only imperative tools following the runtime's
   convention resolve with `"ERROR: ..."` strings. Assert accordingly per tool
@@ -96,7 +100,7 @@ as the expected property in the actual target Chrome build.
 
 ## Harness
 
-Instantiate `templates/webmcp.spec.ts` + `templates/webmcp-compat.js` (bundled with this skill — vendor both together; the spec imports `parseInputSchema` from the helper on the Node side, and carries inlined `isNativeExecuteTool`/`normalizeResult` copies inside `page.evaluate` because the browser cannot close over imports) — Playwright,
+Instantiate `templates/webmcp.spec.ts` + `templates/webmcp-compat.js` (bundled with this skill — vendor both together; the spec imports `parseInputSchema` from the helper on the Node side, and carries an inlined `normalizeResult` copy inside `page.evaluate` because the browser cannot close over imports) — Playwright,
 headed persistent Chrome, one describe-block per tool generated from the manifest,
 with real assertions (never commented-out placeholders). Put the generated spec
 next to the repo's existing e2e tests.

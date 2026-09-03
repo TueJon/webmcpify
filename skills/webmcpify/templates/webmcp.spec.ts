@@ -90,26 +90,34 @@ async function executeTool(p: Page, name: string, args: object): Promise<string 
   return p.evaluate(
     async ({ name, args }) => {
       // inline helpers: page.evaluate cannot close over outer imports
-      // native WebIDL executeTool stringifies as [native code]; JS stubs/polyfills show source.
-      // Works for present AND omitted inputSchema (native zero-param tools still need JSON-string args).
-      const isNativeExecuteTool = (mc: any) =>
-        typeof mc?.executeTool === 'function' && /\[native code\]/.test(mc.executeTool.toString());
       const normalizeResult = (r: unknown) => (r == null ? null : typeof r === 'string' ? (r as string) : JSON.stringify(r));
       const mc = (document as any).modelContext;
-      if (mc?.getTools && mc?.executeTool) {
-        const tools = await mc.getTools();
-        const tool = tools.find((t: { name: string }) => t.name === name);
-        if (!tool) throw new Error(`tool ${name} is not registered`);
-        const isNative = isNativeExecuteTool(mc);
-        if (isNative) return normalizeResult(await mc.executeTool(tool, JSON.stringify(args)));
-        return normalizeResult(await mc.executeTool(tool, args));
-      }
-      // stub fallback (tool object carries .execute)
       if (mc?.getTools) {
         const tools = await mc.getTools();
         const tool = tools.find((t: { name: string }) => t.name === name);
         if (!tool) throw new Error(`tool ${name} is not registered`);
+        // Stub tools carry .execute and take the object (headless-stub contract);
+        // native RegisteredTools never have .execute.
         if (tool?.execute) return normalizeResult(await tool.execute(args));
+        if (mc.executeTool) {
+          // Native contract is JSON-string args — main's behavior, preserved when
+          // executeTool is wrapped (provenance/schema heuristics both fail: wrappers
+          // stringify as JS source; native zero-param tools omit inputSchema).
+          // Spec-shaped stubs signal themselves by rejecting strings with a
+          // TypeError — the only observational difference; retry once with the
+          // object. If the retry also fails, surface the ORIGINAL error so a
+          // handler TypeError on native is never masked by the retry's rejection.
+          try {
+            return normalizeResult(await mc.executeTool(tool, JSON.stringify(args)));
+          } catch (e) {
+            if (!(e instanceof TypeError)) throw e;
+            try {
+              return normalizeResult(await mc.executeTool(tool, args));
+            } catch {
+              throw e;
+            }
+          }
+        }
       }
       throw new Error('No document.modelContext execution surface — insecure origin, headless/wrong Chrome, reused profile, or missing flag');
     },

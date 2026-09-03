@@ -6,13 +6,14 @@ reconstruct them from git history.
 
 ## [Unreleased]
 
-- Added native/stub I/O compat: the verification shim discriminates native vs stub
-  by capability (`[native code]` probe — valid for present AND omitted `inputSchema`,
-  so native zero-param tools get JSON-string args), normalizes stub object
-  results to JSON strings (undefined→null), and ships a shared
-  `templates/webmcp-compat.js` helper vendored with the harness; ambient types
-  widen `executeTool` input/result to the dual contract, and deterministic
-  tests execute the actual template adapter.
+- Added native/stub I/O compat: the harness always sends JSON-string arguments to
+  `executeTool` (native contract — preserved when the method is wrapped, zero-param
+  tools included), calls stub tools' own `execute(object)` directly, and retries with
+  the object only on a `TypeError`-class rejection (the spec-stub signature), surfacing
+  the original error when the retry also fails; stub object results normalize to JSON
+  strings (undefined→null). Ships a shared `templates/webmcp-compat.js` vendored with
+  the harness; ambient types widen `executeTool` input/result to the dual contract;
+  deterministic tests execute the actual template adapter, wrapped native included.
 - Added an explicit `curated | parity` coverage choice, policy-backed inventory
   verdicts, and a required route→tool coverage map (an element census for parity).
 - Made secure context, verification origin, backend origins and CORS assumptions

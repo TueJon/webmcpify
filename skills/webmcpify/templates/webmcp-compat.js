@@ -36,12 +36,14 @@ export function parseInputSchema(raw) {
 }
 
 /**
- * Native WebIDL executeTool stringifies as [native code]; JS stubs/polyfills
- * show source. Stable for present AND omitted inputSchema — native zero-param
- * tools (no schema) still require JSON-string arguments.
+ * Stub tools carry .execute and take the object; native RegisteredTools never
+ * have .execute. For mc.executeTool surfaces no static heuristic works (wrapped
+ * native stringifies as JS; native zero-param tools omit inputSchema) — send the
+ * JSON string first (native contract) and retry with the object only on a
+ * TypeError-class rejection, the spec-stub signature.
  */
-export function isNativeExecuteTool(mc) {
-  return typeof mc?.executeTool === 'function' && /\[native code\]/.test(mc.executeTool.toString());
+export function isStubTool(tool) {
+  return typeof tool?.execute === 'function';
 }
 
 export function normalizeResult(r) {
