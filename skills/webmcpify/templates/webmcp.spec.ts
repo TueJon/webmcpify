@@ -96,14 +96,13 @@ async function executeTool(p: Page, name: string, args: object): Promise<string 
         const tools = await mc.getTools();
         const tool = tools.find((t: { name: string }) => t.name === name);
         if (!tool) throw new Error(`tool ${name} is not registered`);
-        // Stub tools carry .execute and take the object (headless-stub contract);
-        // native RegisteredTools never have .execute — explicit capability, no retry.
+        // Explicit adapter mode — no heuristics, no retry:
+        // - tool.execute(object): headless-era stub
+        // - mc.__webmcpStubObjectMode + mc.executeTool(tool, object): spec-shaped stub (enumerated tool has no .execute)
+        // - otherwise native mc.executeTool(tool, JSON string): Chrome (wrapped-safe, omitted-schema-safe)
         if (typeof tool?.execute === 'function') return normalizeResult(await tool.execute(args));
         if (mc.executeTool) {
-          // Native contract is JSON-string args — main's behavior, preserved when
-          // executeTool is wrapped and for omitted inputSchema (zero-param). No
-          // transport retry: a handler TypeError after mutation must never trigger
-          // a second execution.
+          if ((mc as any).__webmcpStubObjectMode) return normalizeResult(await mc.executeTool(tool, args));
           return normalizeResult(await mc.executeTool(tool, JSON.stringify(args)));
         }
       }

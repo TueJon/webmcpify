@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isStubTool, normalizeResult, parseInputSchema } from '../skills/webmcpify/templates/webmcp-compat.js';
+import { isStubTool, isStubObjectExecute, normalizeResult, parseInputSchema } from '../skills/webmcpify/templates/webmcp-compat.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const specSrc = readFileSync(join(root, 'skills/webmcpify/templates/webmcp.spec.ts'), 'utf8');
@@ -29,6 +29,7 @@ function loadTemplateExecuteTool() {
     .replace(/\(r: unknown\)/g, '(r)')
     .replace(/\(e as any\)/g, '(e)')
     .replace(/\(document as any\)/g, '(document)')
+    .replace(/\(mc as any\)/g, '(mc)')
     .replace(/\(r as string\)/g, '(r)');
   return (name, args, modelContext) =>
     new Function('name', 'args', 'document', `return (async () => {${body}})()`)(name, args, { modelContext });
@@ -40,7 +41,7 @@ test('LLM envelope: string|object/undefined inputSchema → object parameters', 
   assert.deepEqual(parseInputSchema(undefined), { type: 'object', properties: {} });
 });
 
-test('helpers: normalizeResult maps undefined/null/string/object; isStubTool checks the stub contract', () => {
+test('helpers: normalizeResult maps undefined/null/string/object; isStubTool/isStubObjectExecute', () => {
   assert.equal(normalizeResult(undefined), null, 'undefined must become null, not leak through');
   assert.equal(normalizeResult(null), null);
   assert.equal(normalizeResult('already-string'), 'already-string');
@@ -49,6 +50,9 @@ test('helpers: normalizeResult maps undefined/null/string/object; isStubTool che
   assert.equal(isStubTool({ execute: async () => {} }), true, 'stub tools carry .execute');
   assert.equal(isStubTool({ inputSchema: { type: 'object' } }), false, 'native RegisteredTools never do');
   assert.equal(isStubTool({}), false);
+  assert.equal(isStubObjectExecute({ __webmcpStubObjectMode: true }), true, 'explicit stub-object mode flag');
+  assert.equal(isStubObjectExecute({}), false, 'native has no stub-object flag');
+  assert.equal(isStubObjectExecute({ __webmcpStubObjectMode: false }), false);
 });
 
 test('webmcp.spec.ts page.evaluate is browser-serializable and heuristic-free', () => {
@@ -58,7 +62,9 @@ test('webmcp.spec.ts page.evaluate is browser-serializable and heuristic-free', 
   assert.ok(!block.match(/typeof tool\?*\.?inputSchema === 'string'/), 'schema-shape discriminator must not return (omitted schemas break it)');
   assert.ok(block.includes('JSON.stringify(args)'), 'native contract is JSON string');
   assert.ok(!block.includes('e instanceof TypeError'), 'no TypeError retry — handler must not double-execute');
+  assert.ok(!block.match(/Failed to parse/), 'no exception-message matching — use explicit capability');
   assert.ok(block.includes("typeof tool?.execute === 'function'"), 'stub discriminator via tool.execute');
+  assert.ok(block.includes('__webmcpStubObjectMode'), 'spec-shaped stub via explicit mc.__webmcpStubObjectMode');
 });
 
 test('template executeTool: native (unwrapped) with present string schema → string input', async () => {
@@ -142,6 +148,68 @@ test('template executeTool: stub tool carrying .execute (no mc.executeTool) — 
     getTools: async () => [{ name: 't', inputSchema: { type: 'object' }, execute: async () => undefined }],
   };
   assert.equal(await exec('t', {}, mcUndefined), null, 'undefined stub result must normalize to null');
+});
+
+test('template executeTool: spec-shaped stub via mc.executeTool(object) with present schema — no .execute', async () => {
+  const exec = loadTemplateExecuteTool();
+  const seen = [];
+  const mc = {
+    __webmcpStubObjectMode: true,
+    getTools: async () => [{ name: 't', inputSchema: { type: 'object', properties: { q: { type: 'string' } } } }],
+    executeTool: async (tool, input) => {
+      seen.push(typeof input);
+      assert.equal(typeof input, 'object', 'spec-shaped stub must receive object, not string');
+      assert.deepEqual(input, { q: 'hi' });
+      if (typeof input === 'string') throw new TypeError('inputObject must be an object');
+      return { ok: true };
+    },
+  };
+  const out = await exec('t', { q: 'hi' }, mc);
+  assert.equal(out, JSON.stringify({ ok: true }));
+  assert.deepEqual(seen, ['object']);
+});
+
+test('template executeTool: spec-shaped stub via mc.executeTool(object) with OMITTED inputSchema', async () => {
+  const exec = loadTemplateExecuteTool();
+  const seen = [];
+  const mc = {
+    __webmcpStubObjectMode: true,
+    getTools: async () => [{ name: 't' }], // no inputSchema — zero-param spec stub
+    executeTool: async (tool, input) => {
+      seen.push(typeof input);
+      assert.equal(typeof input, 'object', 'stub zero-param must receive object');
+      assert.deepEqual(input, {});
+      return { ok: true };
+    },
+  };
+  assert.equal(await exec('t', {}, mc), JSON.stringify({ ok: true }));
+  assert.deepEqual(seen, ['object']);
+});
+
+test('template executeTool: spec-shaped stub respects explicit mode even when wrapped', async () => {
+  const exec = loadTemplateExecuteTool();
+  const stubImpl = async (tool, input) => {
+    assert.equal(typeof input, 'object', 'wrapped stub-object still needs object');
+    return { ok: true };
+  };
+  const mc = {
+    __webmcpStubObjectMode: true,
+    getTools: async () => [{ name: 't', inputSchema: JSON.stringify({ type: 'object' }) }],
+    executeTool: async (...a) => stubImpl(...a),
+  };
+  assert.equal(await exec('t', { q: 'hi' }, mc), JSON.stringify({ ok: true }));
+});
+
+test('template executeTool: native without flag still uses string even if inputSchema is object-shaped (spec stub not flagged)', async () => {
+  const exec = loadTemplateExecuteTool();
+  const mc = {
+    getTools: async () => [{ name: 't', inputSchema: { type: 'object' } }], // object but no flag → native assumed
+    executeTool: async (tool, input) => {
+      assert.equal(typeof input, 'string', 'without explicit stub flag, native string contract applies');
+      return JSON.stringify({ ok: true });
+    },
+  };
+  assert.equal(await exec('t', { q: 'hi' }, mc), JSON.stringify({ ok: true }));
 });
 
 test('template executeTool: wrapped native handler TypeError after mutation — no double-execute', async () => {

@@ -36,13 +36,21 @@ export function parseInputSchema(raw) {
 }
 
 /**
- * Stub tools carry .execute and take the object; native RegisteredTools never
- * have .execute. Native mc.executeTool always takes a JSON string (even when
- * wrapped or with omitted inputSchema) — no transport retry, so a handler
- * TypeError never double-executes.
+ * Explicit adapter mode — no heuristics, no retry:
+ * - stub via direct tool.execute(object) — headless-era stub
+ * - stub via mc.executeTool(tool, object) — spec-shaped stub (RegisteredTool
+ *   has no .execute); distinguished by explicit mc.__webmcpStubObjectMode set
+ *   by the stub harness
+ * - native mc.executeTool(tool, JSON string) — Chrome native (also when wrapped
+ *   or with omitted inputSchema)
+ * A handler TypeError never double-executes; collapse when spec norms.
  */
 export function isStubTool(tool) {
   return typeof tool?.execute === 'function';
+}
+
+export function isStubObjectExecute(mc) {
+  return !!mc?.__webmcpStubObjectMode;
 }
 
 export function normalizeResult(r) {

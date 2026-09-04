@@ -64,9 +64,11 @@ interface ModelContext extends EventTarget {
    */
   executeTool?(
     tool: RegisteredTool,
-    inputJson: string | object, // native wants JSON string (wrapped-safe, omitted-schema-safe); stub .execute wants object — no retry; collapse when spec norms
+    inputJson: string | object, // native: JSON string (wrapped-safe, omitted-schema-safe); stub .execute or stub-object mc.executeTool: object — discriminated by explicit capability (tool.execute / mc.__webmcpStubObjectMode), no retry; collapse when spec norms
     options?: { signal?: AbortSignal },
   ): Promise<ModelContextToolResult | null>;
+  /** Explicit stub-object capability for spec-shaped mc.executeTool(object) — set by stub harness, never native. */
+  __webmcpStubObjectMode?: boolean;
 }
 
 interface ModelContextTool {
