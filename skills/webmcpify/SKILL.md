@@ -28,7 +28,7 @@ DETECT ──▶ INVENTORY ──▶ [HUMAN GATE: manifest approval] ──▶ I
 
 Everything you need ships inside this skill directory: phase guides in
 `references/`, and vendorable code in `templates/` (runtime, ambient types,
-JS variant, React JSX typings, verification spec). Never assume files exist
+JS variant, React JSX typings, verification spec + compat helper). Never assume files exist
 outside the skill dir.
 
 **Out of scope** (stop and say so): backend-only MCP servers (that's classic MCP,
@@ -164,7 +164,7 @@ Manifest schema (Webmcpify Manifest v4):
     },
     "setup": {                     // PATHS created/modified per one-time setup step ([] = not done yet)
       "runtimeVendored": ["src/webmcp/webmcpify.ts", "src/webmcp/webmcp.d.ts"],
-      "harnessInstalled": [".webmcpify/webmcp.spec.ts"],
+      "harnessInstalled": [".webmcpify/webmcp.spec.ts", ".webmcpify/webmcp-compat.js"],
       "originTrialNoted": ["README.md"]
     },
     "discovery": null,             // optional off-page layer (references/discovery.md). Stays null unless

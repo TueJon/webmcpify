@@ -38,6 +38,8 @@
  */
 import { chromium, expect, test } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
+// @ts-expect-error — shared JS helper; inlined copies live inside page.evaluate (browser boundary)
+import { parseInputSchema } from './webmcp-compat.js';
 
 function requiredEnv(name: 'WEBMCP_BASE_URL' | 'WEBMCP_PROFILE_DIR'): string {
   const value = process.env[name]?.trim();
@@ -64,11 +66,11 @@ test.afterAll(async () => {
   await context.close();
 });
 
-/** Enumerate registered tools; inputSchema comes back as a STRING (JSON Schema). */
+/** Enumerate registered tools; native returns STRINGIFIED JSON Schema, stubs may return object — handle both. */
 async function listTools(p: Page): Promise<
   Array<{
     name: string;
-    inputSchema?: string;
+    inputSchema?: string | object;
     annotations?: { readOnlyHint?: boolean; untrustedContentHint?: boolean };
   }>
 > {
@@ -87,12 +89,22 @@ async function listTools(p: Page): Promise<
 async function executeTool(p: Page, name: string, args: object): Promise<string | null> {
   return p.evaluate(
     async ({ name, args }) => {
+      // inline helpers: page.evaluate cannot close over outer imports — keep in sync with webmcp-compat.js
+      const normalizeResult = (r: unknown) => (r == null ? null : typeof r === 'string' ? (r as string) : JSON.stringify(r));
       const mc = (document as any).modelContext;
-      if (mc?.getTools && mc?.executeTool) {
+      if (mc?.getTools) {
         const tools = await mc.getTools();
         const tool = tools.find((t: { name: string }) => t.name === name);
         if (!tool) throw new Error(`tool ${name} is not registered`);
-        return mc.executeTool(tool, JSON.stringify(args));
+        // Explicit adapter mode — no heuristics, no retry:
+        // - tool.execute(object): headless-era stub
+        // - mc.__webmcpStubObjectMode + mc.executeTool(tool, object): spec-shaped stub (enumerated tool has no .execute)
+        // - otherwise native mc.executeTool(tool, JSON string): Chrome (wrapped-safe, omitted-schema-safe)
+        if (typeof tool?.execute === 'function') return normalizeResult(await tool.execute(args));
+        if (mc.executeTool) {
+          if ((mc as any).__webmcpStubObjectMode) return normalizeResult(await mc.executeTool(tool, args));
+          return normalizeResult(await mc.executeTool(tool, JSON.stringify(args)));
+        }
       }
       throw new Error('No document.modelContext execution surface — insecure origin, headless/wrong Chrome, reused profile, or missing flag');
     },
@@ -143,7 +155,7 @@ test.describe('search_tickets', () => {
     expect(await waitForTool(page, 'search_tickets')).toBe(true); // async registration — poll
     const tools = await listTools(page);
     const tool = tools.find((t) => t.name === 'search_tickets')!;
-    const schema = JSON.parse(tool.inputSchema ?? '{}'); // stringified → parse first
+    const schema = parseInputSchema(tool.inputSchema); // handles string, object, or undefined
     expect(schema.required).toContain('query'); // manifest: inputSchema
     // manifest: annotations — assert exactly what the manifest recorded
     expect(tool.annotations?.readOnlyHint).toBe(true);

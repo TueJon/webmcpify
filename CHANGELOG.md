@@ -6,6 +6,15 @@ reconstruct them from git history.
 
 ## [Unreleased]
 
+- Added native/stub I/O compat: the harness uses an explicit adapter mode —
+  stub `tool.execute(object)` or spec-shaped `mc.executeTool(object)` when
+  `mc.__webmcpStubObjectMode` is set, native `mc.executeTool(JSON string)` otherwise
+  (preserved when wrapped, zero-param tools included) with no retry so handler
+  `TypeError` never double-executes; stub object results normalize to JSON strings
+  (undefined→null). Ships a shared `templates/webmcp-compat.js` vendored with the
+  harness; ambient types widen `executeTool` input/result to the dual contract;
+  deterministic tests execute the actual template adapter, wrapped native and
+  spec-shaped stub included.
 - Added an explicit `curated | parity` coverage choice, policy-backed inventory
   verdicts, and a required route→tool coverage map (an element census for parity).
 - Made secure context, verification origin, backend origins and CORS assumptions

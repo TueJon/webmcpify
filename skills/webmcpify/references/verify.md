@@ -36,10 +36,16 @@ const tools = await mc.getTools();
 
 Contract facts that generated assertions MUST respect:
 
-- Enumerated `inputSchema` is a **stringified** JSON Schema — `JSON.parse` before
-  comparing against the manifest entry.
-- `executeTool(...)` resolves to a **string result, or `null` when the execution
-  navigated** (normal for declarative forms that submit-navigate).
+- Enumerated `inputSchema` may be stringified (Chrome native lag) or object (spec/stub) — `typeof === "string" ? JSON.parse(s) : s ?? {type:'object',properties:{}}` before comparing.
+- `executeTool(...)` resolves to a **JSON string result, or `null` when the execution
+  navigated** — stub may return object; normalize via `typeof` before `toMatch`.
+- **Native `executeTool` needs JSON-string arguments even for tools with OMITTED
+  `inputSchema`** (zero-param): `executeTool(tool, '{}')`, not `executeTool(tool, {})`.
+  The harness uses an explicit adapter mode: stub `tool.execute(object)` or
+  spec-shaped `mc.executeTool(tool, object)` when `mc.__webmcpStubObjectMode` is set,
+  native `mc.executeTool(tool, JSON.stringify(args))` otherwise — preserved when
+  wrapped and for omitted schemas. No retry: a handler `TypeError` after mutation
+  must never trigger a second execution.
 - Execution and declarative-validation failures **reject the promise** — they do
   not resolve to `"ERROR: ..."`. Only imperative tools following the runtime's
   convention resolve with `"ERROR: ..."` strings. Assert accordingly per tool
@@ -55,6 +61,14 @@ Contract facts that generated assertions MUST respect:
   submit → await the result (full example in the template).
 - These surfaces are for agents/harnesses only — they must never appear in shipped
   application code.
+
+### LLM runner — handle both shapes (the 400 recipe)
+
+When an LLM agent loop consumes `getTools` -> OpenAI-compatible `tools` -> `executeTool`:
+
+- `inputSchema` is stringified on native — do `typeof s === "string" ? JSON.parse(s) : s ?? {type:'object',properties:{}}` before sending `parameters: <object>` to the LLM; otherwise `400 'tools.0.function.parameters must be object'` -> loop 502s.
+- Missing `tools` with `tool_choice:none` surfaces as `tool_use_failed` — don't force `tool_choice`; use `disable_tool_validation: true` only when needed.
+- Result may be stringified JSON (`"{\"ok\":true}"`) on native or object on stub — `typeof r === "string" ? try{JSON.parse(r)}catch{ r } : r` and `resultOk` helpers must handle both.
 
 For **declarative** tools also verify the *synthesized* schema: the form-control →
 schema mapping is only partially specified, so check each annotated control appears
@@ -85,7 +99,7 @@ as the expected property in the actual target Chrome build.
 
 ## Harness
 
-Instantiate `templates/webmcp.spec.ts` (bundled with this skill) — Playwright,
+Instantiate `templates/webmcp.spec.ts` + `templates/webmcp-compat.js` (bundled with this skill — vendor both together; the spec imports `parseInputSchema` from the helper on the Node side, and carries an inlined `normalizeResult` copy inside `page.evaluate` because the browser cannot close over imports) — Playwright,
 headed persistent Chrome, one describe-block per tool generated from the manifest,
 with real assertions (never commented-out placeholders). Put the generated spec
 next to the repo's existing e2e tests.
