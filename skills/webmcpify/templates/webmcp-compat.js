@@ -37,10 +37,9 @@ export function parseInputSchema(raw) {
 
 /**
  * Stub tools carry .execute and take the object; native RegisteredTools never
- * have .execute. For mc.executeTool surfaces no static heuristic works (wrapped
- * native stringifies as JS; native zero-param tools omit inputSchema) — send the
- * JSON string first (native contract) and retry with the object only on a
- * TypeError-class rejection, the spec-stub signature.
+ * have .execute. Native mc.executeTool always takes a JSON string (even when
+ * wrapped or with omitted inputSchema) — no transport retry, so a handler
+ * TypeError never double-executes.
  */
 export function isStubTool(tool) {
   return typeof tool?.execute === 'function';

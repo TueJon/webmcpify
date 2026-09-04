@@ -56,9 +56,9 @@ test('webmcp.spec.ts page.evaluate is browser-serializable and heuristic-free', 
   assert.ok(block.includes('const normalizeResult'), 'normalize helper defined inside evaluate');
   assert.ok(!block.includes('[native code]'), 'provenance heuristic must not return (wrapped native breaks it)');
   assert.ok(!block.match(/typeof tool\?*\.?inputSchema === 'string'/), 'schema-shape discriminator must not return (omitted schemas break it)');
-  assert.ok(block.includes('JSON.stringify(args)'), 'string-first: native contract');
-  assert.ok(block.includes('e instanceof TypeError'), 'TypeError-class retry for spec stubs');
-  assert.ok(block.includes('tool?.execute'), 'stub tools called via their own execute');
+  assert.ok(block.includes('JSON.stringify(args)'), 'native contract is JSON string');
+  assert.ok(!block.includes('e instanceof TypeError'), 'no TypeError retry — handler must not double-execute');
+  assert.ok(block.includes("typeof tool?.execute === 'function'"), 'stub discriminator via tool.execute');
 });
 
 test('template executeTool: native (unwrapped) with present string schema → string input', async () => {
@@ -106,31 +106,26 @@ test('template executeTool: WRAPPED native with OMITTED inputSchema → string i
   assert.equal(await exec('t', {}, mc), JSON.stringify({ ok: true }));
 });
 
-test('template executeTool: spec stub with OMITTED inputSchema → rejects string, retries object', async () => {
-  const calls = [];
+test('template executeTool: stub via tool.execute with OMITTED inputSchema → object', async () => {
   const exec = loadTemplateExecuteTool();
   const mc = {
-    getTools: async () => [{ name: 't' }], // no inputSchema — spec-shaped stub zero-param tool
-    executeTool: async (tool, input) => {
-      calls.push(typeof input);
-      if (typeof input === 'string') throw new TypeError('inputObject must be an object');
+    getTools: async () => [{ name: 't', execute: async (args) => {
+      assert.deepEqual(args, {}, 'stub receives object even without schema');
       return { ok: true };
-    },
+    } }],
   };
-  assert.equal(await exec('t', {}, mc), JSON.stringify({ ok: true }), 'object result normalized to JSON string');
-  assert.deepEqual(calls, ['string', 'object'], 'string tried first, TypeError retry with object');
+  assert.equal(await exec('t', {}, mc), JSON.stringify({ ok: true }));
 });
 
-test('template executeTool: spec stub with object schema → rejects string, retries object', async () => {
+test('template executeTool: stub via tool.execute with object schema → object', async () => {
   const exec = loadTemplateExecuteTool();
   const mc = {
-    getTools: async () => [{ name: 't', inputSchema: { type: 'object' } }],
-    executeTool: async (tool, input) => {
-      if (typeof input === 'string') throw new TypeError('inputObject must be an object');
+    getTools: async () => [{ name: 't', inputSchema: { type: 'object' }, execute: async (args) => {
+      assert.deepEqual(args, { q: 'hi' });
       return { ok: true };
-    },
+    } }],
   };
-  assert.equal(await exec('t', { q: 'hi' }, mc), JSON.stringify({ ok: true }), 'object result normalized to JSON string');
+  assert.equal(await exec('t', { q: 'hi' }, mc), JSON.stringify({ ok: true }));
 });
 
 test('template executeTool: stub tool carrying .execute (no mc.executeTool) — object input, incl. undefined result', async () => {
@@ -149,17 +144,20 @@ test('template executeTool: stub tool carrying .execute (no mc.executeTool) — 
   assert.equal(await exec('t', {}, mcUndefined), null, 'undefined stub result must normalize to null');
 });
 
-test('template executeTool: native handler TypeError surfaces (no silent mask)', async () => {
+test('template executeTool: wrapped native handler TypeError after mutation — no double-execute', async () => {
   const exec = loadTemplateExecuteTool();
+  let calls = 0; let mutations = 0;
+  const nativeImpl = async (tool, input) => {
+    calls++; mutations++;
+    throw new TypeError('handler bug after mutation');
+  };
   const mc = {
     getTools: async () => [{ name: 't', inputSchema: JSON.stringify({ type: 'object' }) }],
-    executeTool: async (tool, input) => {
-      assert.equal(typeof input, 'string');
-      throw new TypeError('handler bug: not a transport error');
-    },
+    executeTool: async (...a) => nativeImpl(...a), // wrapped
   };
-  // both attempts fail with the handler's own TypeError — the error is not swallowed
   await assert.rejects(() => exec('t', {}, mc), /handler bug/);
+  assert.equal(calls, 1, 'handler must be invoked exactly once');
+  assert.equal(mutations, 1, 'mutation must not double-execute');
 });
 
 test('template executeTool: unregistered tool rejects with a clear error', async () => {

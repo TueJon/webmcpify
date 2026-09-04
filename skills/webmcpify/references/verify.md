@@ -41,12 +41,11 @@ Contract facts that generated assertions MUST respect:
   navigated** — stub may return object; normalize via `typeof` before `toMatch`.
 - **Native `executeTool` needs JSON-string arguments even for tools with OMITTED
   `inputSchema`** (zero-param): `executeTool(tool, '{}')`, not `executeTool(tool, {})`.
-  The harness sends the string first — preserved when `executeTool` is wrapped for
-  instrumentation — and retries once with the object only on a `TypeError`-class
-  rejection, the spec-stub signature; if the retry also fails, the original error
-  surfaces. Stub tools carrying their own `.execute` are called with the object
-  directly. No schema-shape or function-source heuristics: both fail (native
-  zero-param tools omit the schema; wrappers stringify as JS source).
+  The harness distinguishes native vs stub by explicit capability: stub tools carry
+  their own `tool.execute` and are called with the object; native `mc.executeTool`
+  always receives `JSON.stringify(args)` — preserved when wrapped for instrumentation
+  and for omitted schemas. No retry: a handler `TypeError` after mutation must never
+  trigger a second execution.
 - Execution and declarative-validation failures **reject the promise** — they do
   not resolve to `"ERROR: ..."`. Only imperative tools following the runtime's
   convention resolve with `"ERROR: ..."` strings. Assert accordingly per tool

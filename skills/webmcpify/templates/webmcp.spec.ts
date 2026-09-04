@@ -97,26 +97,14 @@ async function executeTool(p: Page, name: string, args: object): Promise<string 
         const tool = tools.find((t: { name: string }) => t.name === name);
         if (!tool) throw new Error(`tool ${name} is not registered`);
         // Stub tools carry .execute and take the object (headless-stub contract);
-        // native RegisteredTools never have .execute.
+        // native RegisteredTools never have .execute — explicit capability, no retry.
         if (typeof tool?.execute === 'function') return normalizeResult(await tool.execute(args));
         if (mc.executeTool) {
           // Native contract is JSON-string args — main's behavior, preserved when
-          // executeTool is wrapped (provenance/schema heuristics both fail: wrappers
-          // stringify as JS source; native zero-param tools omit inputSchema).
-          // Spec-shaped stubs signal themselves by rejecting strings with a
-          // TypeError — the only observational difference; retry once with the
-          // object. If the retry also fails, surface the ORIGINAL error so a
-          // handler TypeError on native is never masked by the retry's rejection.
-          try {
-            return normalizeResult(await mc.executeTool(tool, JSON.stringify(args)));
-          } catch (e) {
-            if (!(e instanceof TypeError) && (e as any)?.name !== 'TypeError') throw e;
-            try {
-              return normalizeResult(await mc.executeTool(tool, args));
-            } catch {
-              throw e;
-            }
-          }
+          // executeTool is wrapped and for omitted inputSchema (zero-param). No
+          // transport retry: a handler TypeError after mutation must never trigger
+          // a second execution.
+          return normalizeResult(await mc.executeTool(tool, JSON.stringify(args)));
         }
       }
       throw new Error('No document.modelContext execution surface — insecure origin, headless/wrong Chrome, reused profile, or missing flag');
