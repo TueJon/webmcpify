@@ -1,7 +1,7 @@
 ---
 name: webmcpify
-description: WebMCP agent skill for curated core coverage or route-by-route parity — inventory an existing web app, integrate approved tools, then verify and heal them in a real browser. Use for "webmcpify", "add WebMCP", or "expose app actions to AI agents".
-argument-hint: "[inventory|integrate|verify|status|full] [scope notes]"
+description: WebMCP agent skill for curated core coverage or route-by-route parity — inventory an existing web app, integrate approved tools, then inspect, verify and heal them in a real browser. Use for "webmcpify", "add WebMCP", or "expose app actions to AI agents".
+argument-hint: "[inventory|integrate|workbench|verify|status|full] [scope notes]"
 license: MIT
 tags:
   - webmcp
@@ -43,6 +43,7 @@ The user may pass an argument (`/webmcpify <mode>` or plain words):
 | *(none)* or `full` | all phases, resuming from current manifest state | done |
 | `inventory` / `map` | DETECT + INVENTORY loops only — **zero code changes** | present the manifest table for review |
 | `integrate` | INTEGRATE loop only (requires approved tools in the manifest) | integrated + built |
+| `workbench` / `inspect` | launch the temporary visual inspector for approved/integrated tools | user closes the session |
 | `verify` | VERIFY + HEAL loops on integrated/verified tools | green/skipped report |
 | `status` | read `.webmcpify/manifest.json` — **read-only** | report phase, per-status tool counts, and the recommended next command |
 
@@ -79,6 +80,9 @@ Any other text is scoping guidance (e.g. "only the checkout area", "read-only to
 7. **Commits are opt-in.** Never commit unless the human chose a commit policy at
    the gate (see below). Without git or without permission, leave changes in the
    working tree and record progress in the manifest only.
+8. **Workbench evidence is explicit.** The optional visual Workbench is development-
+   only and agent-launched (`references/workbench.md`). It must always label evidence
+   `Native` or `Simulated`; simulated calls never satisfy native verification.
 
 ## Fresh, authoritative guidance
 
@@ -367,6 +371,21 @@ a published manifest, and flag one **the pipeline created or modified** since
 `baselineSha` as an unmapped hunk (a pre-existing, untouched manifest is not your
 hunk — leave it alone).
 
+## Optional — WORKBENCH (visual inspection)
+
+When the user asks to inspect or try tools visually, read
+`references/workbench.md` and launch the temporary Workbench yourself. Prefer its
+Playwright runner: it injects before application code, requires no extension,
+flag, command, or project edit from the user, and cleans up when the browser
+closes. The panel must visibly say `Native` or `Simulated`.
+
+Use the approved manifest as Expected evidence and the live page as Observed
+evidence. Simulated mode is useful for portable browser/device and responsive
+checks, but never changes a tool to `verified`; the normal headed native-browser
+loop below remains authoritative. Never ship Workbench in a production entry or
+bundle. If a physical device requires temporary dev-entry wiring, the agent adds
+and removes it within the same inspection session.
+
 ## Phase 3 — VERIFY (loop)
 
 Set up once from `templates/webmcp.spec.ts` per `references/verify.md` (real headed
@@ -439,6 +458,7 @@ scope collisions).
 - `references/inventory.md` — area mapping, naming/schema conventions, budgets/overlap
 - `references/integrate.md` — declarative + imperative patterns per stack
 - `references/runtime.md` — vendoring + wiring the `templates/` runtime
+- `references/workbench.md` — zero-setup visual inspection and evidence modes
 - `references/verify.md` — harness setup: flags, surfaces, Playwright/Puppeteer, evals
 - `references/heal.md` — failure taxonomy → fixes
 - `references/discovery.md` — optional off-page discovery (manifest, `rel="webmcp"`,

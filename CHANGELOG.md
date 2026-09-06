@@ -6,6 +6,11 @@ reconstruct them from git history.
 
 ## [Unreleased]
 
+- Added an agent-launched, dependency-free visual WebMCP Workbench with the
+  WebMCPify palette, responsive desktop/phone layouts, manifest comparison,
+  schema-driven arguments, structured results, mutation confirmation, and
+  explicit `Native` versus `Simulated` evidence. The portable simulation is
+  development-only and never counts as native verification.
 - Added native/stub I/O compat: the harness uses an explicit adapter mode —
   stub `tool.execute(object)` or spec-shaped `mc.executeTool(object)` when
   `mc.__webmcpStubObjectMode` is set, native `mc.executeTool(JSON string)` otherwise
