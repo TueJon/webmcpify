@@ -28,6 +28,26 @@ test('launcher can provision Playwright outside a target project', () => {
   assert.ok(!runnerSource.includes("from 'playwright'"));
   assert.match(runnerSource, /tmpdir\(\)/);
   assert.match(runnerSource, /PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD/);
+  assert.match(runnerSource, /JSON\.stringify\(\{ manifest, open: true \}\)/);
+});
+
+test('manifest input exposes only tools that passed the approval gate', () => {
+  const api = loadApi();
+  const manifest = { tools: [
+    { id: 'new', status: 'discovered' },
+    { id: 'denied', status: 'rejected' },
+    { id: 'approved', status: 'approved' },
+    { id: 'wired', status: 'integrated' },
+    { id: 'working', status: 'verified' },
+    { id: 'healing', status: 'failed' },
+    { id: 'impossible', status: 'skipped' },
+  ] };
+  assert.deepEqual(Array.from(api.normalizeExpected(manifest), (tool) => tool.id), [
+    'approved', 'wired', 'working', 'healing',
+  ]);
+  assert.deepEqual(Array.from(api.normalizeExpected(manifest.tools), (tool) => tool.id), [
+    'new', 'denied', 'approved', 'wired', 'working', 'healing', 'impossible',
+  ], 'an explicit expectedTools array remains a caller-owned approved subset');
 });
 
 test('workbench parses native string schemas and formats structured results', () => {

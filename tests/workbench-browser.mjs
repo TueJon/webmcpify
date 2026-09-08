@@ -37,6 +37,10 @@ document.modelContext.registerTool({
   inputSchema:{type:'object',properties:{id:{type:'string',default:'T-42'}},required:['id']},
   annotations:{readOnlyHint:false,untrustedContentHint:false}, async execute(input){ return {ok:true,closed:input.id}; }
 });
+document.modelContext.registerTool({
+  name:'rejected_tool', description:'Must remain inspection-only.',
+  inputSchema:{type:'object',properties:{}}, async execute(){ return {shouldNotRun:true}; }
+});
 </script></body></html>`;
 
 const server = createServer((request, response) => {
@@ -82,7 +86,7 @@ try {
         const panel = host.locator('.panel');
         await panel.waitFor();
         assert.equal(await host.locator('.evidence').textContent(), 'Simulated');
-        assert.equal(await host.locator('.tool-row').count(), 4);
+        assert.equal(await host.locator('.tool-row').count(), 5);
         if (fixture.viewport.width <= 640) await host.locator('.tool-select').selectOption('search_tickets');
         else await host.locator('.tool-row', { hasText: 'search_tickets' }).click();
         assert.equal(await host.locator('input[name="query"]').inputValue(), 'billing');
@@ -143,6 +147,24 @@ try {
         await context.close();
       }
       console.log(`${name}: desktop, phone dark/reduced-motion, tablet passed`);
+
+      const gateContext = await browser.newContext({ viewport: { width: 1000, height: 760 } });
+      const manifest = { tools: [
+        { id: 'search_tickets', status: 'integrated', mutating: false },
+        { id: 'rejected_tool', status: 'rejected', mutating: false },
+        { id: 'discovered_tool', status: 'discovered', mutating: false },
+      ] };
+      await gateContext.addInitScript({ content: `globalThis.__WEBMCPIFY_WORKBENCH__ = ${JSON.stringify({ manifest, open: true })};\n${source}` });
+      const gatePage = await gateContext.newPage();
+      await gatePage.goto(url);
+      const gateHost = gatePage.locator('#webmcpify-workbench');
+      assert.equal(await gateHost.locator('.tool-row', { hasText: 'discovered_tool' }).count(), 0);
+      await gateHost.locator('.tool-row', { hasText: 'rejected_tool' }).click();
+      assert.match(await gateHost.locator('.tool-meta').textContent(), /Excluded by manifest gate/);
+      assert.equal(await gateHost.locator('.run').isDisabled(), true);
+      assert.equal(await gateHost.locator('.expected').textContent(), 'Not present in the approved manifest.');
+      await gateContext.close();
+      console.log(`${name}: manifest approval boundary passed`);
 
       if (name === 'chromium') {
         const context = await browser.newContext({ viewport: { width: 1100, height: 760 } });

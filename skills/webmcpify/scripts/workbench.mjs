@@ -73,7 +73,7 @@ const browserType = { chromium, firefox, webkit }[browserName];
 const manifestPath = value('--manifest');
 const manifest = manifestPath ? JSON.parse(await readFile(resolve(manifestPath), 'utf8')) : { tools: [] };
 const source = await readFile(resolve(here, '..', 'templates', 'webmcp-workbench.js'), 'utf8');
-const bootSource = `globalThis.__WEBMCPIFY_WORKBENCH__ = ${JSON.stringify({ expectedTools: manifest.tools ?? [], open: true })};\n${source}`;
+const bootSource = `globalThis.__WEBMCPIFY_WORKBENCH__ = ${JSON.stringify({ manifest, open: true })};\n${source}`;
 const launchOptions = {
   headless: false,
   ...(native ? { channel: 'chrome', args: ['--enable-features=WebMCP,WebMCPTesting'] } : {}),

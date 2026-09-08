@@ -105,13 +105,23 @@
     state.simulatedContext = null;
   }
 
+  const expectedManifestStatuses = new Set(['approved', 'integrated', 'verified', 'failed']);
+
   function normalizeExpected(raw) {
-    const source = Array.isArray(raw) ? raw : raw?.tools;
-    return (source ?? []).filter((tool) => tool && tool.id).map((tool) => ({
+    const explicitSubset = Array.isArray(raw);
+    const source = explicitSubset ? raw : raw?.tools;
+    return (source ?? []).filter((tool) => tool && tool.id
+      && (explicitSubset || expectedManifestStatuses.has(tool.status))).map((tool) => ({
       ...tool,
       name: tool.name ?? tool.id,
       inputSchema: parseSchema(tool.inputSchema),
     }));
+  }
+
+  function excludedManifestNames(raw) {
+    if (Array.isArray(raw)) return new Set();
+    return new Set((raw?.tools ?? []).filter((tool) => tool && tool.id
+      && !expectedManifestStatuses.has(tool.status)).map((tool) => tool.name ?? tool.id));
   }
 
   function declarativeTools(doc) {
@@ -162,8 +172,10 @@
     if (!global.document?.documentElement) throw new Error('WebMCP Workbench needs a document.');
     const doc = global.document;
     const installed = preinstalled ?? installContext(doc);
-    const expected = normalizeExpected(options.expectedTools ?? options.manifest);
+    const expectedSource = options.expectedTools ?? options.manifest;
+    const expected = normalizeExpected(expectedSource);
     const expectedByName = new Map(expected.map((tool) => [tool.name, tool]));
+    const excludedByName = excludedManifestNames(expectedSource);
     const host = doc.createElement('div');
     host.id = 'webmcpify-workbench';
     host.dataset.evidence = installed.evidence;
@@ -218,6 +230,7 @@
 
     function statusLabel(tool) {
       if (tool._observed === false) return 'Expected only';
+      if (excludedByName.has(tool.name)) return 'Excluded by manifest gate';
       if (!expectedByName.size) return 'Observed';
       const expectedTool = expectedByName.get(tool.name);
       if (!expectedTool) return 'Observed only';
@@ -331,7 +344,7 @@
       ui.result.textContent = 'Run the tool to inspect its structured result.';
       ui.resultMeta.textContent = 'Not run';
       ui.run.textContent = `Run ${tool.name}`;
-      ui.run.disabled = tool._observed === false;
+      ui.run.disabled = tool._observed === false || excludedByName.has(tool.name);
     }
 
     function readArguments() {
@@ -346,7 +359,7 @@
 
     async function execute() {
       const tool = selected();
-      if (!tool) return;
+      if (!tool || tool._observed === false || excludedByName.has(tool.name)) return;
       ui.run.disabled = true;
       ui.resultMeta.textContent = 'Running…';
       const started = performance.now();
@@ -369,7 +382,10 @@
         ui.resultMeta.textContent = `Failed · ${duration} ms`;
         ui.live.textContent = `${tool.name} failed.`;
         renderHistory({ name: tool.name, status: 'Failed', duration, args, result: error?.message ?? String(error) });
-      } finally { ui.run.disabled = false; }
+      } finally {
+        const current = selected();
+        ui.run.disabled = !current || current._observed === false || excludedByName.has(current.name);
+      }
     }
 
     function requestRun() {
@@ -587,6 +603,7 @@
     stop() { state.instance?.destroy(); },
     parseSchema,
     formatResult: json,
+    normalizeExpected,
     createSimulationContext: makeSimulationContext,
   };
   global.WebMCPifyWorkbench = api;
