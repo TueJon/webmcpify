@@ -6,11 +6,18 @@ reconstruct them from git history.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-09-09
+
 - Added an agent-launched, dependency-free visual WebMCP Workbench with the
   WebMCPify palette, responsive desktop/phone layouts, manifest comparison,
   schema-driven arguments, structured results, mutation confirmation, and
   explicit `Native` versus `Simulated` evidence. The portable simulation is
   development-only and never counts as native verification.
+- Added the CG draft's `consequentialHint` across ambient types, inventory,
+  integration, security, manifest examples, and verification so significant
+  real-world or non-reversible effects are signaled without weakening the
+  application's actual safety boundaries. Verification records the dated Chrome
+  150 omission instead of falsely claiming native enumeration support.
 - Added native/stub I/O compat: the harness uses an explicit adapter mode —
   stub `tool.execute(object)` or spec-shaped `mc.executeTool(object)` when
   `mc.__webmcpStubObjectMode` is set, native `mc.executeTool(JSON string)` otherwise
@@ -50,3 +57,5 @@ reconstruct them from git history.
   agent skill rather than an MCP server.
 
 [0.4.0]: https://github.com/TueJon/webmcpify/releases/tag/v0.4.0
+[0.5.0]: https://github.com/TueJon/webmcpify/compare/v0.4.0...v0.5.0
+[Unreleased]: https://github.com/TueJon/webmcpify/compare/v0.5.0...HEAD

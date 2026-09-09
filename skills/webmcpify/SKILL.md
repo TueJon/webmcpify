@@ -65,6 +65,9 @@ Any other text is scoping guidance (e.g. "only the checkout area", "read-only to
    a credential, token, key, JWT, signed URL, or cookie; and no irreversible delete
    except by opening the app's own confirmation UI. Creating or changing ordinary
    product objects is in scope and must not be mistaken for account creation.
+   Mark a tool with `consequentialHint: true` when execution has a significant
+   real-world or non-reversible effect. This is agent metadata, never a replacement
+   for the application's authorization, confirmation, idempotency, or replay guards.
 3. **The server is the only trust boundary.** A tool's `execute()` may only call code
    paths the UI already uses (same endpoints, same validation, same auth). Never
    create new endpoints, never bypass existing checks, never put secrets in tools.
@@ -209,7 +212,7 @@ Manifest schema (Webmcpify Manifest v4):
       "priority": 1,               // 1 = expose first; 2/3 = later waves
       "description": "Creates a new ticket in the currently open project.",
       "inputSchema": { /* JSON Schema */ },
-      "annotations": { "readOnlyHint": false, "untrustedContentHint": false }, // verify asserts these on the enumerated tool
+      "annotations": { "readOnlyHint": false, "untrustedContentHint": false, "consequentialHint": false }, // verify asserts all recorded hints
       "source": ["src/features/tickets/NewTicket.tsx:42"], // the UI code path it wraps
       "route": "/projects/demo/tickets",                    // where verify navigates
       "auth": ["role:member"],     // "none" | "session" | ["role:<name>", ...] — keys into app.authFixtures; verify runs once per listed role

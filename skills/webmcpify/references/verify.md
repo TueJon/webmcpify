@@ -37,6 +37,11 @@ const tools = await mc.getTools();
 Contract facts that generated assertions MUST respect:
 
 - Enumerated `inputSchema` may be stringified (Chrome native lag) or object (spec/stub) — `typeof === "string" ? JSON.parse(s) : s ?? {type:'object',properties:{}}` before comparing.
+- The CG draft and Chrome docs define `consequentialHint`, but Chrome 150 accepted
+  it at registration and omitted it from `getTools()`. Assert the expected value
+  when the enumerated property exists; otherwise record a dated browser-compatibility
+  annotation and prove the registration object in an app/unit test. Never claim
+  native propagation from an absent field.
 - `executeTool(...)` resolves to a **JSON string result, or `null` when the execution
   navigated** — stub may return object; normalize via `typeof` before `toMatch`.
 - **Native `executeTool` needs JSON-string arguments even for tools with OMITTED

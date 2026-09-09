@@ -71,7 +71,11 @@ async function listTools(p: Page): Promise<
   Array<{
     name: string;
     inputSchema?: string | object;
-    annotations?: { readOnlyHint?: boolean; untrustedContentHint?: boolean };
+    annotations?: {
+      readOnlyHint?: boolean;
+      untrustedContentHint?: boolean;
+      consequentialHint?: boolean;
+    };
   }>
 > {
   return p.evaluate(async () => {
@@ -160,6 +164,18 @@ test.describe('search_tickets', () => {
     // manifest: annotations — assert exactly what the manifest recorded
     expect(tool.annotations?.readOnlyHint).toBe(true);
     expect(tool.annotations?.untrustedContentHint).toBe(true);
+    // CG draft + current Chrome docs define consequentialHint, but Chrome 150
+    // accepted it at registration without returning it from getTools(). Assert
+    // native propagation when present; keep the registration object covered by
+    // app/unit tests and report an omitted field as browser compatibility evidence.
+    if (tool.annotations?.consequentialHint !== undefined) {
+      expect(tool.annotations.consequentialHint).toBe(false);
+    } else {
+      test.info().annotations.push({
+        type: 'webmcp-compatibility',
+        description: 'Browser omitted consequentialHint from getTools(); last reproduced in Chrome 150',
+      });
+    }
   });
 
   test('executes the valid example and changes the UI', async () => {

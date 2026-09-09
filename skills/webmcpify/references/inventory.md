@@ -44,15 +44,15 @@ too big; merge trivial ones.
 
 Walk each area's UI code and list **user actions**, not functions:
 
-| UI pattern | Candidate tool | `mutating` | `readOnlyHint` |
-|---|---|---|---|
-| Search/filter form or input | `search_<noun>` | false | true |
-| Data list/detail currently rendered | `list_<noun>` / `get_<noun>` | false | true |
-| Create/edit form with submit → API call | `create_<noun>` / `update_<noun>` | "server" | — |
-| Button triggering a server state change | `<verb>_<noun>` | "server" | — |
-| Preference/theme/localStorage toggle | `<verb>_<noun>` | "client" | — |
-| Multi-step flow (wizard, checkout) | `start_<noun>_flow` (initiation) | false* | **never** |
-| Contact/booking form (static sites) | declarative form annotation | "server" | — |
+| UI pattern | Candidate tool | `mutating` | `readOnlyHint` | `consequentialHint` |
+|---|---|---|---|---|
+| Search/filter form or input | `search_<noun>` | false | true | false |
+| Data list/detail currently rendered | `list_<noun>` / `get_<noun>` | false | true | false |
+| Create/edit form with submit → API call | `create_<noun>` / `update_<noun>` | "server" | — | classify by effect |
+| Button triggering a server state change | `<verb>_<noun>` | "server" | — | classify by effect |
+| Preference/theme/localStorage toggle | `<verb>_<noun>` | "client" | — | false |
+| Multi-step flow (wizard, checkout) | `start_<noun>_flow` (initiation) | false* | **never** | false* |
+| Contact/booking form (static sites) | declarative form annotation | "server" | — | true |
 
 *Initiation tools only navigate/open the flow — the human completes it. They are
 classified non-mutating (no data changes) **but must NOT carry `readOnlyHint`**:
@@ -65,6 +65,12 @@ localStorage — nothing leaves the browser) | `"server"` (data leaves the brows
 dev/test-data-only verification; `"client"` may be batch-approved at the gate
 (`cleanup` recommended). `toolautosubmit` is banned for **both** mutation classes
 (ground rule 5).
+
+`consequentialHint` is a separate risk dimension, not a synonym for `mutating`.
+Set it only when execution has a significant real-world or non-reversible effect
+(for example sending, publishing, booking, payment, permission change, or deletion).
+An initiation tool that only opens the application's real confirmation UI remains
+`false`; the final action stays outside the tool. The hint does not enforce safety.
 
 **Policy gates — use these exact classes.** Exclude auth/login/session/password/
 MFA/SSO; signup/registration/payment/billing/subscription; any tool that returns a
@@ -121,6 +127,8 @@ Agents degrade when many similar tools compete. Enforce while drafting:
   (`"High"`, not `priority_id: 3`).
 - Tools returning user-generated or external content get
   `untrustedContentHint: true`.
+- Consequential tools get `consequentialHint: true` and retain every existing
+  application-side confirmation, authorization, idempotency, and replay guard.
 
 ## Choosing `kind`
 
@@ -138,7 +146,7 @@ Fill EVERY field of the v4 schema:
 
 - `route` + `auth` (array of roles keying into `app.authFixtures`; verify runs
   once per role).
-- `annotations` — `readOnlyHint`/`untrustedContentHint` per the candidate table;
+- `annotations` — `readOnlyHint`/`untrustedContentHint`/`consequentialHint` per the candidate table;
   verify asserts them on the enumerated tool.
 - `examples` — one valid + one invalid. `invalid: null` is allowed ONLY for
   readOnly tools with no/empty params (verify then asserts dual-outcome); the
