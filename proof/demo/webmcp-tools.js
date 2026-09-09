@@ -13,7 +13,7 @@ window.addEventListener('webmcpify:integrate', () => {
     name: 'set_release_filter',
     description: 'Filters the visible synthetic release notes by category using the page existing filter path.',
     inputSchema: schema,
-    annotations: { readOnlyHint: false, untrustedContentHint: false },
+    annotations: { readOnlyHint: false, untrustedContentHint: false, consequentialHint: false },
     execute: ({ category }) => {
       if (!schema.properties.category.enum.includes(category)) {
         return 'ERROR: category must be one of all, feature, or fix.';

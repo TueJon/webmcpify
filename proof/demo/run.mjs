@@ -110,6 +110,11 @@ try {
   assert(tool);
   assert.equal(tool.annotations.readOnlyHint, false);
   assert.equal(tool.annotations.untrustedContentHint, false);
+  assert.equal(
+    tool.annotations.consequentialHint,
+    undefined,
+    'Chrome compatibility changed: update the dated consequentialHint evidence and harness expectation',
+  );
   assert.deepEqual(JSON.parse(tool.inputSchema), {
     type: 'object',
     properties: { category: { type: 'string', enum: ['all', 'feature', 'fix'] } },
@@ -172,7 +177,7 @@ try {
     await rename(generated, sourceVideo);
     console.log(`recorded ${sourceVideo}`);
   }
-  console.log(`proof verified in Chrome ${chromeVersion}: native getTools/executeTool, schema, annotations, UI delta, bounded invalid input, cleanup`);
+  console.log(`proof verified in Chrome ${chromeVersion}: native getTools/executeTool, schema, annotations (consequentialHint omitted by this build), UI delta, bounded invalid input, cleanup`);
 } finally {
   await browser?.close().catch(() => {});
   await new Promise((resolve) => server.close(resolve));

@@ -35,7 +35,7 @@
       "required": ["category"],
       "additionalProperties": false
     },
-    "annotations": { "readOnlyHint": false, "untrustedContentHint": false },
+    "annotations": { "readOnlyHint": false, "untrustedContentHint": false, "consequentialHint": false },
     "source": ["proof/demo/app.js:applyFilter"],
     "route": "/",
     "auth": ["none"],

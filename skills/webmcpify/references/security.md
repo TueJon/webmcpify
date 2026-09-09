@@ -56,6 +56,9 @@ both directions. Design every tool as if it were a public, authenticated API end
       confirmation based on it; mislabeling is the worst single mistake).
 - [ ] `untrustedContentHint: true` on every tool returning user-generated or
       external content.
+- [ ] `consequentialHint: true` on every tool whose execution has a significant
+      real-world or non-reversible effect. It is a client signal, not enforcement:
+      preserve application authorization, confirmation, idempotency and replay guards.
 - [ ] Outputs capped (~1.5k chars) and free of instruction-like content where
       possible.
 

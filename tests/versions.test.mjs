@@ -52,3 +52,18 @@ test('public distribution descriptions carry the same coverage contract', () => 
   assert.match(reference, /curated core coverage/);
   assert.match(reference, /route-by-route parity/);
 });
+
+test('the v0.5.0 contract carries the consequential-action hint end to end', () => {
+  const typeTemplate = readFileSync(join(root, 'skills/webmcpify/templates/webmcp.d.ts'), 'utf8');
+  const skill = readFileSync(join(root, 'skills/webmcpify/SKILL.md'), 'utf8');
+  const security = readFileSync(join(root, 'skills/webmcpify/references/security.md'), 'utf8');
+  const verify = readFileSync(join(root, 'skills/webmcpify/templates/webmcp.spec.ts'), 'utf8');
+  for (const [file, content] of [
+    ['webmcp.d.ts', typeTemplate],
+    ['SKILL.md', skill],
+    ['security.md', security],
+    ['webmcp.spec.ts', verify],
+  ]) {
+    assert.match(content, /consequentialHint/, `${file} must carry consequentialHint`);
+  }
+});

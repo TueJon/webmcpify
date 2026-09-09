@@ -76,6 +76,7 @@ Open your agent in the target repo and pick your scope:
 /webmcpify                # full pipeline
 /webmcpify inventory      # just investigate + propose the tool manifest (zero code changes)
 /webmcpify integrate      # integrate the approved manifest
+/webmcpify workbench      # agent launches the temporary visual tool inspector
 /webmcpify verify         # verify + heal what's integrated
 /webmcpify status         # where are we? what's next?
 /webmcpify full parity    # census every interactive element on every authenticated route
@@ -145,8 +146,8 @@ Every phase is a **loop over persistent state**, not a one-shot pass:
 | Path | Purpose |
 |---|---|
 | [`skills/webmcpify/SKILL.md`](skills/webmcpify/SKILL.md) | The pipeline (what your agent follows) |
-| [`skills/webmcpify/references/`](skills/webmcpify/references/) | Phase guides: inventory, integrate, runtime, verify, heal, security, discovery |
-| [`skills/webmcpify/templates/`](skills/webmcpify/templates/) | Vendorable runtime (TS + JS), ambient types, Playwright verification template, discovery manifest |
+| [`skills/webmcpify/references/`](skills/webmcpify/references/) | Phase guides: inventory, integrate, Workbench, runtime, verify, heal, security, discovery |
+| [`skills/webmcpify/templates/`](skills/webmcpify/templates/) | Vendorable runtime (TS + JS), temporary visual Workbench, ambient types, Playwright verification template, discovery manifest |
 
 ## Status
 
