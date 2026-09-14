@@ -158,6 +158,26 @@ Key rules:
   console during integration; a silently missing toolset usually means a duplicate
   name or invalid schema rejected the batch.
 
+### Framework lifecycle acceptance
+
+Register only in the browser after the owning UI is mounted/hydrated; never
+execute browser globals during SSR. Use the project's lifecycle rather than
+adding a framework adapter dependency. Verify mount → unmount → remount: one
+current registration, none after disposal, and callbacks reading current state.
+
+- React: create the scope inside `useEffect` and return its disposer. Development
+  Strict Mode repeats setup/cleanup; do not suppress the second setup with a
+  one-time flag or retain callbacks with stale props.
+- Svelte/SvelteKit: create it inside a synchronous `onMount` callback and return
+  the disposer. An `async` onMount callback returns a promise, not cleanup.
+- Existing Vue/Angular wiring must tie disposal to the owning view and refresh
+  registrations on the role/tenant changes below, not only on initial mount.
+
+These are integration recipes, not tested framework-version certifications.
+Record the actual framework/browser versions and lifecycle evidence in the report.
+Sources: [React effects](https://react.dev/reference/react/useEffect),
+[Svelte lifecycle](https://svelte.dev/docs/svelte/lifecycle-hooks).
+
 ### Auth / roles (SaaS)
 
 Never register a tool the current session couldn't use through the UI. On

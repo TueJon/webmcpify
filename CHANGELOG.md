@@ -6,6 +6,9 @@ reconstruct them from git history.
 
 ## [Unreleased]
 
+- Tightened eval execution with reviewed versions, bounded runs and approved data;
+  added independent mutation-effect checks and React/Svelte lifecycle acceptance.
+
 - Added input-aware re-verification on resume: retain valid evidence, invalidate
   affected tools after app/runtime/browser changes, and reconcile uncertain
   interrupted mutations before retrying. Status remains read-only.

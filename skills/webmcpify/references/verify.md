@@ -152,15 +152,25 @@ Puppeteer. As documented on 2026-08-29, that `page.webmcp` surface requires
 Chrome 151+ and `--enable-features=WebMCP`; keep this requirement separate from
 the page-context Playwright harness above, which was measured against Chrome 150.
 
-## Agent evals (recommended; mandatory for SaaS-scale toolsets)
+## Agent evals (recommended; required evidence for SaaS-scale readiness claims)
 
 Schema-level verification proves tools *work*, not that an LLM *picks* them or
 completes a journey. Keep the layers distinct:
 
+Before executing an eval runner, use a reviewed exact version from the target
+project or obtain approval to install one. Record allowed origins/fixtures, runner
+version, model/backend, case count, runs per case, maximum steps and a time/spend
+limit. Start with synthetic data. Model-backed runs may send schemas, prompts and
+tool results to the provider: use only an approved backend and data scope. Missing
+credentials or budget means `not run`, never a deterministic verification failure
+or permission to provision an account. Keep trajectories local and redacted.
+
 1. Run Google's experimental **WebMCP Evals CLI**
    (GoogleChromeLabs/webmcp-tools, package `webmcp-evals`) in `smoke` mode first.
    It replays `expectedCall` entries against the live page without a model or API
-   key, so failures here are deterministic integration failures.
+   key. It still executes real tools: review concrete arguments (including samples
+   resolved from matchers), isolate/reset each fixture and retain mutation approvals.
+   A smoke failure may be environment or integration; classify before healing.
 2. Run model-backed evals with multiple runs. Include at least one direct prompt
    and one realistic ambiguous prompt per tool, plus ordered or unordered
    multi-tool cases for each critical journey. Supply the complete route/state
@@ -173,8 +183,22 @@ completes a journey. Keep the layers distinct:
    available.
 
 Use `local` for fast schema/selection iteration and `browser` for real exposed
-tools. Evals remain probabilistic evidence; they do not replace the deterministic
+tools. Record case-level successes/attempts, failures, skipped cases and environment;
+never report a success percentage without its denominator. Evals remain probabilistic evidence; they do not replace the deterministic
 registration, execution, UI-delta, cleanup, and safeguard checks above.
+
+## Effect boundaries for mutations
+
+For each approved mutation, assert its intended effect through an independent
+UI/read path, then assert a relevant neighboring record or invariant stayed
+unchanged. A correct call and a success result alone prove neither. Use synthetic
+fixtures and the existing authorized read path; do not add privileged endpoints.
+For example, updating fixture item A must leave fixture item B unchanged. Keep
+that assertion unchanged when repairing a handler and run cleanup even on failure.
+If the effect cannot be observed, report the evidence gap rather than `verified`.
+This complements selection evals; it is not a claim of exhaustive side-effect coverage.
+
+Runner reference: [Google WebMCP Evals](https://github.com/GoogleChromeLabs/webmcp-tools/tree/main/webmcp-evals).
 
 ## Manual QA (tell the human in the report)
 
