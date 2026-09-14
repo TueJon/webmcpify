@@ -172,9 +172,9 @@ needs `chrome://flags/#enable-webmcp-testing`. The API surface has already chang
 during the trial (testing API removed 2026-07; `navigator` → `document`) — webmcpify
 isolates that churn in one vendored file, and its verification surfaces probe
 whether the browser uses current object input or Chrome 150's legacy JSON-string
-input without retrying real tools. It treats Google's live
-[modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance) as the
-source of current best practices at integration time.
+input without retrying real tools. It reads the official Chrome guides and CG draft directly at integration time.
+The optional modern-web-guidance CLI requires a reviewed exact version and
+separate approval before execution.
 
 Release-by-release spec adaptations are recorded in the [changelog](CHANGELOG.md).
 ChatGPT's separate, model/account-gated client surface is documented as
@@ -186,7 +186,7 @@ and a troubleshooting order.
 - [webmcpify.at](https://webmcpify.at) — project website (itself agent-ready, in all three layers: imperative tools via the vendored runtime, a declarative install form, and a published `/.well-known/webmcp` manifest)
 - [webmachinelearning/webmcp](https://github.com/webmachinelearning/webmcp) — the spec draft (W3C WebML CG)
 - [GoogleChromeLabs/webmcp-tools](https://github.com/GoogleChromeLabs/webmcp-tools) — Google's demos, types, and evals CLI (webmcpify follows these patterns)
-- [GoogleChrome/modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance) — official best-practice guides (webmcpify pulls its WebMCP guides live)
+- [GoogleChrome/modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance) — official best-practice guides (optional CLI; exact version and execution approval required)
 - [Puppeteer WebMCP](https://pptr.dev/guides/webmcp) — experimental first-class WebMCP automation API (Chrome 151+ as documented 2026-08-29; alternative verify harness)
 - [MCP-B / WebMCP-org](https://github.com/WebMCP-org/npm-packages) — WebMCP ecosystem: polyfill, extension, transports, and dev tooling (webmcpify vendors a minimal runtime instead of adding dependencies)
 

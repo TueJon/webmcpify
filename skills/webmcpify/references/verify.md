@@ -152,6 +152,16 @@ Puppeteer. As documented on 2026-08-29, that `page.webmcp` surface requires
 Chrome 151+ and `--enable-features=WebMCP`; keep this requirement separate from
 the page-context Playwright harness above, which was measured against Chrome 150.
 
+## Mutation dispatch prerequisite
+
+Before using the spec template, Puppeteer, Workbench, smoke or model runners,
+read [the durable journal protocol](reverify.md#durable-mutation-execution-journal).
+The supplied browser/runtime helpers do not implement host persistence. Instrument
+all mutation dispatches and cleanup with its atomic pre-dispatch/settlement hooks,
+and disable automatic retries. A runner without such hooks is read-only for this
+workflow; report mutation checks not-run. Reconcile existing started entries
+before selecting tools, including entries on verified/skipped tools.
+
 ## Agent evals (recommended; required evidence for SaaS-scale readiness claims)
 
 Schema-level verification proves tools *work*, not that an LLM *picks* them or

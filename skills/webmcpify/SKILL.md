@@ -238,6 +238,7 @@ Manifest schema (Webmcpify Manifest v4):
                                    //   "productionSideEffect": null } — set only when verification unavoidably
                                    //   causes a real production effect (see VERIFY: production side-effect policy)
       "contractRevision": 1,
+      "mutationExecutions": [],    // durable pre-dispatch journal; references/reverify.md
       "verifiedAgainst": null,     // successful evidence record; see references/reverify.md (absent = unknown)
       "failure": null,             // on failure: { "class": "contract|implementation|environment|external-policy|flaky|client-capacity", "signature": "...", "contractRevision": 1 }
       "attempts": 0,               // independent retries of this failure signature under this contract revision
@@ -404,6 +405,10 @@ and removes it within the same inspection session.
 
 Set up once from `templates/webmcp.spec.ts` per `references/verify.md` (real headed
 Chrome; current production `document.modelContext.getTools()`/`executeTool()` surface).
+Before any execution, enforce the durable mutation journal in
+`references/reverify.md`: scan unresolved attempts, persist each mutation before
+dispatch, and settle only after independent reconciliation and cleanup. Wire the
+host-side hooks into the chosen runner; without them, mutations are blocked.
 Then loop over every `integrated` tool, using its manifest `route`, `auth`,
 `examples`, `expect`, and `annotations` fields:
 
@@ -430,6 +435,8 @@ path — mark the tool `skipped` with a blocker note.
 
 ## Phase 4 — HEAL (loop)
 
+Preserve and reconcile mutation journal entries before every retry; a failure
+status or contract revision never clears uncertain execution.
 While any tool is `"failed"`: diagnose via `references/heal.md`, fix **only** that
 tool's integration — **implementation-only** fixes; if the fix would change the
 approved contract (schema, description, `mutating` class, `annotations`,

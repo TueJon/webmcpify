@@ -38,6 +38,60 @@ an unavailable app/build revision; without a usable file map treat reuse as
 unproven. A backend build/config change relevant to the UI path also invalidates
 the evidence even when frontend files did not change.
 
+## Durable mutation execution journal
+
+Manifest v4 adds `mutationExecutions: []` on each tool. This is a required
+workflow journal for new mutation runs, not a browser API or an automatic feature
+of the vendored runtime. Before using a runner, implement its Node/host-side
+pre-dispatch and settlement hooks; a browser-only callback is not durable.
+
+Each entry has `executionId`, `tool`, `contractRevision`, `origin`, `role`,
+`fixtureRevision`, `argumentsFingerprint` (SHA-256 of canonical JSON with sorted
+object keys), `startedAt`, `state` (`started` or `reconciled`), and local redacted
+`evidence`. Do not store raw secrets or arguments; keep sensitive fingerprints
+local. Use a new executionId for every authorized invocation, including invalid
+examples and cleanup actions that can mutate. Fingerprints identify attempts;
+they are not a server idempotency guarantee.
+
+1. Before any runner starts, scan **all tools**, regardless of terminal status,
+   for `started` entries. Serialize runners with an exclusive host-side manifest
+   lock. If another runner owns the lock, stop; never overwrite its journal.
+2. Reconcile unresolved entries through an independent authoritative read path
+   using their original role/fixture/argument identity. Resolve required cleanup
+   too. Unknown outcome or unverified cleanup blocks further mutation dispatch,
+   even with different arguments. A stale lock after a dead process may be
+   recovered only after confirming no runner remains; retain its started entries.
+3. Before each mutation dispatch, under the lock append a `started` entry and
+   durably replace the manifest (write a sibling temporary file, fsync it,
+   atomic rename, fsync the directory). Verify the stored entry before calling
+   the tool. Persistence failure means **do not dispatch**. Hold ownership through
+   reconciliation; concurrent sessions must not race this protocol.
+4. After execution, independently establish the effect or proven absence of an
+   effect, verify the expected/unchanged records and complete required cleanup.
+   Only then atomically mark `reconciled` with outcome, timestamp and evidence.
+   Keep the entry for audit; `verified` is a separate verdict requiring all checks.
+   Timeouts, cancellation, exception, failed cleanup or process death leave
+   `started` intact. Never clear it on an error handler or status reset.
+5. Cleanup that mutates needs its own pre-dispatch entry linked by
+   `parentExecutionId`. During recovery only the specifically reconciled cleanup
+   action may bypass the unresolved-parent gate; uncertain cleanup itself must
+   be read/reconciled before retry. Do not recursively schedule cleanup of cleanup.
+
+Apply this to VERIFY, HEAL retries, Playwright/Puppeteer harnesses, manual
+Workbench invocations and smoke/model evals. Disable runner-level retries and
+wrap **every** dispatch, including model-selected calls, with the journal hooks.
+If an external runner cannot expose those hooks, expose only read-only tools or
+mark mutation evals not-run; pre-recording an entire eval is insufficient.
+`status` remains read-only and reports unresolved entries without reconciling.
+
+Migration: a missing array means historical evidence is unknown, **not** an
+in-flight call. On the next execution-capable resume, initialize it to `[]`,
+clear historical `verifiedAgainst`, and reset formerly verified tools to
+`integrated` for fresh checks within the approved scope. Do not invent started
+records for old completed runs. If the operator or logs establish an actual
+interrupted legacy mutation, record it as unresolved and reconcile before replay.
+Never erase existing journal entries during migration or contract invalidation.
+
 ## Resume with bounded invalidation
 
 1. `status` reads and reports counts plus evidence age/unknowns; it never starts a
