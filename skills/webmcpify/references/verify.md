@@ -73,7 +73,7 @@ Contract facts that generated assertions MUST respect:
 
 When an LLM agent loop consumes `getTools` -> OpenAI-compatible `tools` -> `executeTool`:
 
-- `inputSchema` is stringified on native — do `typeof s === "string" ? JSON.parse(s) : s ?? {type:'object',properties:{}}` before sending `parameters: <object>` to the LLM; otherwise `400 'tools.0.function.parameters must be object'` -> loop 502s.
+- Native `inputSchema` may be stringified on older builds or object-shaped on current builds — do `typeof s === "string" ? JSON.parse(s) : s ?? {type:'object',properties:{}}` before sending `parameters: <object>` to the LLM; otherwise `400 'tools.0.function.parameters must be object'` -> loop 502s.
 - Missing `tools` with `tool_choice:none` surfaces as `tool_use_failed` — don't force `tool_choice`; use `disable_tool_validation: true` only when needed.
 - Result may be stringified JSON (`"{\"ok\":true}"`) on native or object on stub — `typeof r === "string" ? try{JSON.parse(r)}catch{ r } : r` and `resultOk` helpers must handle both.
 

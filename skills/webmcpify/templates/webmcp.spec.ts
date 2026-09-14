@@ -68,7 +68,7 @@ test.afterAll(async () => {
   await context.close();
 });
 
-/** Enumerate registered tools; native returns STRINGIFIED JSON Schema, stubs may return object — handle both. */
+/** Enumerate registered tools; older native builds may stringify JSON Schema while current builds return objects — handle both. */
 async function listTools(p: Page): Promise<
   Array<{
     name: string;
