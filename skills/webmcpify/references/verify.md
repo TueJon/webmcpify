@@ -36,7 +36,9 @@ const tools = await mc.getTools();
 
 Contract facts that generated assertions MUST respect:
 
-- Enumerated `inputSchema` may be stringified (Chrome native lag) or object (spec/stub) — `typeof === "string" ? JSON.parse(s) : s ?? {type:'object',properties:{}}` before comparing.
+- Enumerated `inputSchema` may be stringified (older Chrome) or object (current
+  implementations/spec stubs) — `typeof === "string" ? JSON.parse(s) : s ??
+  {type:'object',properties:{}}` before comparing.
 - The CG draft and Chrome docs define `consequentialHint`, but Chrome 150 accepted
   it at registration and omitted it from `getTools()`. Assert the expected value
   when the enumerated property exists; otherwise record a dated browser-compatibility
@@ -44,13 +46,13 @@ Contract facts that generated assertions MUST respect:
   native propagation from an absent field.
 - `executeTool(...)` resolves to a **JSON string result, or `null` when the execution
   navigated** — stub may return object; normalize via `typeof` before `toMatch`.
-- **Native `executeTool` needs JSON-string arguments even for tools with OMITTED
-  `inputSchema`** (zero-param): `executeTool(tool, '{}')`, not `executeTool(tool, {})`.
-  The harness uses an explicit adapter mode: stub `tool.execute(object)` or
-  spec-shaped `mc.executeTool(tool, object)` when `mc.__webmcpStubObjectMode` is set,
-  native `mc.executeTool(tool, JSON.stringify(args))` otherwise — preserved when
-  wrapped and for omitted schemas. No retry: a handler `TypeError` after mutation
-  must never trigger a second execution.
+- The current CG draft and Chrome documentation use a JavaScript object for
+  `executeTool` input. Chrome 150 still requires a JSON string, including for
+  tools with omitted `inputSchema`, and Chrome documents string input as
+  deprecated from 155. The harness registers and executes one temporary,
+  side-effect-free probe tool to select `object` or `json-string`, then invokes
+  every application tool exactly once in that mode. Never retry a real tool after
+  an exception: its handler may already have mutated state.
 - Execution and declarative-validation failures **reject the promise** — they do
   not resolve to `"ERROR: ..."`. Only imperative tools following the runtime's
   convention resolve with `"ERROR: ..."` strings. Assert accordingly per tool

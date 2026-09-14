@@ -86,7 +86,7 @@
 
   function installContext(doc) {
     const nativeContext = doc.modelContext ?? global.navigator?.modelContext;
-    if (nativeContext) return { context: nativeContext, evidence: 'native' };
+    if (nativeContext) return { context: nativeContext, evidence: 'native', inputMode: null };
     const context = makeSimulationContext(doc);
     try {
       Object.defineProperty(doc, 'modelContext', { configurable: true, value: context });
@@ -94,7 +94,40 @@
       doc.modelContext = context;
     }
     state.simulatedContext = context;
-    return { context, evidence: 'simulated' };
+    return { context, evidence: 'simulated', inputMode: Promise.resolve('object') };
+  }
+
+  async function detectExecuteInputMode(installed) {
+    if (installed.inputMode) return installed.inputMode;
+    installed.inputMode = (async () => {
+      const context = installed.context;
+      const controller = new AbortController();
+      const name = `webmcpify_input_probe_${global.crypto.randomUUID().replaceAll('-', '')}`;
+      let calls = 0;
+      await context.registerTool({
+        name,
+        description: 'Side-effect-free verification of the browser executeTool input contract.',
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+        async execute() { calls += 1; return 'webmcpify-input-probe'; },
+      }, { signal: controller.signal });
+      try {
+        const tool = (await context.getTools()).find((candidate) => candidate.name === name);
+        if (!tool) throw new Error('WebMCP input-contract probe did not register.');
+        try {
+          await context.executeTool(tool, {});
+          if (calls !== 1) throw new Error('Object-input probe did not execute exactly once.');
+          return 'object';
+        } catch (error) {
+          if (calls !== 0) throw error;
+          await context.executeTool(tool, '{}');
+          if (calls !== 1) throw new Error('JSON-string input probe did not execute exactly once.');
+          return 'json-string';
+        }
+      } finally {
+        controller.abort();
+      }
+    })();
+    return installed.inputMode;
   }
 
   function removeSimulatedContext(doc, installed) {
@@ -366,11 +399,10 @@
       let args;
       try {
         args = readArguments();
+        const inputMode = await detectExecuteInputMode(installed);
         const result = tool._declarativeForm
           ? await executeDeclarative(tool, args)
-          : installed.context.__webmcpStubObjectMode
-            ? await installed.context.executeTool(tool, args)
-            : await installed.context.executeTool(tool, JSON.stringify(args));
+          : await installed.context.executeTool(tool, inputMode === 'object' ? args : JSON.stringify(args));
         ui.result.textContent = json(result);
         const duration = Math.round(performance.now() - started);
         ui.resultMeta.textContent = `Succeeded · ${duration} ms`;
@@ -605,6 +637,7 @@
     formatResult: json,
     normalizeExpected,
     createSimulationContext: makeSimulationContext,
+    detectExecuteInputMode,
   };
   global.WebMCPifyWorkbench = api;
   if (global.__WEBMCPIFY_WORKBENCH__) api.start(global.__WEBMCPIFY_WORKBENCH__);

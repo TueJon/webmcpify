@@ -98,7 +98,7 @@ export const searchTicketsTool = {
 };
 ```
 
-> **Native I/O compat** — `getTools()` returns `inputSchema` stringified on native Chrome but as object in stubs — handle both (`typeof === 'string' ? JSON.parse : id`). `executeTool` needs `JSON.stringify(args)` on native lag, object per spec. For `validate:true`, register with `inputSchema` only. Runner LLM envelope: `const raw=t.inputSchema; const schema=typeof raw==='string'?JSON.parse(raw):raw??{type:'object',properties:{}}; const llmTool={function:{parameters:schema}}` — never pass `parameters` through WebMCP.
+> **Native I/O compat** — `getTools()` may return `inputSchema` as a string on older Chrome or an object on current implementations — handle both (`typeof === 'string' ? JSON.parse : id`). Current `executeTool` takes an object; Chrome 150 needs `JSON.stringify(args)`, so use the capability-probe adapter from the verification template rather than retrying a real tool. For `validate:true`, register with `inputSchema` only. Runner LLM envelope: `const raw=t.inputSchema; const schema=typeof raw==='string'?JSON.parse(raw):raw??{type:'object',properties:{}}; const llmTool={function:{parameters:schema}}` — never pass `parameters` through WebMCP.
 
 Key rules:
 - **Annotations describe risk; they do not enforce it.** Use

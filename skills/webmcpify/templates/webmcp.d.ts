@@ -60,15 +60,15 @@ interface ModelContext extends EventTarget {
    */
   getTools(options?: { fromOrigins?: string[] }): Promise<RegisteredTool[]>;
   /**
-   * Agent/test execution surface in the CG draft; Chrome's origin-trial input
-   * and result serialization still differ from spec-shaped stubs.
+   * Agent/test execution surface in the CG draft. Current Chrome accepts an
+   * object; Chrome 150's JSON-string input remains in the verification adapter.
    */
   executeTool?(
     tool: RegisteredTool,
-    inputJson: string | object, // native: JSON string (wrapped-safe, omitted-schema-safe); stub .execute or stub-object mc.executeTool: object — discriminated by explicit capability (tool.execute / mc.__webmcpStubObjectMode), no retry; collapse when spec norms
+    inputObject?: unknown,
     options?: { signal?: AbortSignal },
   ): Promise<ModelContextToolResult | null>;
-  /** Explicit stub-object capability for spec-shaped mc.executeTool(object) — set by stub harness, never native. */
+  /** Internal simulation capability used by the vendored Workbench. */
   __webmcpStubObjectMode?: boolean;
 }
 
@@ -92,7 +92,7 @@ interface ModelContextTool {
   annotations?: ModelContextToolAnnotations;
 }
 
-/** Shape returned by getTools(). Native returns STRINGIFIED JSON Schema; stubs may return object — handle both. */
+/** Shape returned by getTools(). Older Chrome may stringify JSON Schema — handle both forms. */
 interface RegisteredTool {
   name: string;
   title?: string;

@@ -42,7 +42,7 @@ Browser AI agents (Gemini in Chrome, extensions, assistive tech) are learning to
 call structured page tools instead of scraping the DOM. WebMCP is the emerging
 standard for that, co-authored by Google and Microsoft engineers, in origin trial
 since Chrome 149. Making an app agent-ready by hand means reading a spec that is
-still moving (the API surface changed twice during the trial), learning tool-design
+still moving (the API surface has changed repeatedly during the trial), learning tool-design
 conventions, and building a verification setup — webmcpify packages all of that
 into one command for your coding agent.
 
@@ -156,8 +156,9 @@ estimate, not a commitment): production exposure needs an
 [origin-trial token](https://developer.chrome.com/origintrials/), local development
 needs `chrome://flags/#enable-webmcp-testing`. The API surface has already changed
 during the trial (testing API removed 2026-07; `navigator` → `document`) — webmcpify
-isolates that churn in one vendored file, probes for the current
-enumeration/execution surface, and treats Google's live
+isolates that churn in one vendored file, and its verification surfaces probe
+whether the browser uses current object input or Chrome 150's legacy JSON-string
+input without retrying real tools. It treats Google's live
 [modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance) as the
 source of current best practices at integration time.
 

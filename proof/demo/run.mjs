@@ -12,6 +12,36 @@ const artifacts = join(repo, 'proof', 'artifacts');
 const sourceVideo = join(artifacts, 'webmcpify-proof-source.webm');
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, mode === 'record' ? ms : 20));
 
+async function detectExecuteInputMode(page) {
+  return page.evaluate(async () => {
+    const controller = new AbortController();
+    const name = `webmcpify_input_probe_${crypto.randomUUID().replaceAll('-', '')}`;
+    let calls = 0;
+    await document.modelContext.registerTool({
+      name,
+      description: 'Side-effect-free verification of the browser executeTool input contract.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      async execute() { calls += 1; return 'webmcpify-input-probe'; },
+    }, { signal: controller.signal });
+    try {
+      const tool = (await document.modelContext.getTools()).find((candidate) => candidate.name === name);
+      if (!tool) throw new Error('WebMCP input-contract probe did not register');
+      try {
+        await document.modelContext.executeTool(tool, {});
+        if (calls !== 1) throw new Error('Object-input probe did not execute exactly once');
+        return 'object';
+      } catch (error) {
+        if (calls !== 0) throw error;
+        await document.modelContext.executeTool(tool, '{}');
+        if (calls !== 1) throw new Error('JSON-string input probe did not execute exactly once');
+        return 'json-string';
+      }
+    } finally {
+      controller.abort();
+    }
+  });
+}
+
 const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
 const server = createServer(async (request, response) => {
   try {
@@ -59,6 +89,7 @@ try {
   }));
   assert.deepEqual(nativeSurface, { context: 'object', enumerate: 'function', execute: 'function' });
   assert.equal((await page.evaluate(() => document.modelContext.getTools())).length, 0);
+  const executeInputMode = await detectExecuteInputMode(page);
 
   await page.evaluate(() => {
     window.proof.phase('inventory', 'Inventory the existing app');
@@ -110,12 +141,10 @@ try {
   assert(tool);
   assert.equal(tool.annotations.readOnlyHint, false);
   assert.equal(tool.annotations.untrustedContentHint, false);
-  assert.equal(
-    tool.annotations.consequentialHint,
-    undefined,
-    'Chrome compatibility changed: update the dated consequentialHint evidence and harness expectation',
-  );
-  assert.deepEqual(JSON.parse(tool.inputSchema), {
+  if (tool.annotations.consequentialHint !== undefined) {
+    assert.equal(tool.annotations.consequentialHint, false);
+  }
+  assert.deepEqual(typeof tool.inputSchema === 'string' ? JSON.parse(tool.inputSchema) : tool.inputSchema, {
     type: 'object',
     properties: { category: { type: 'string', enum: ['all', 'feature', 'fix'] } },
     required: ['category'],
@@ -127,10 +156,11 @@ try {
   await delay(2800);
 
   const before = await page.locator('article:visible').count();
-  const result = await page.evaluate(async () => {
+  const result = await page.evaluate(async (inputMode) => {
     const registered = (await document.modelContext.getTools()).find((item) => item.name === 'set_release_filter');
-    return document.modelContext.executeTool(registered, JSON.stringify({ category: 'fix' }));
-  });
+    const args = { category: 'fix' };
+    return document.modelContext.executeTool(registered, inputMode === 'object' ? args : JSON.stringify(args));
+  }, executeInputMode);
   const after = await page.locator('article:visible').count();
   assert.equal(before, 4);
   assert.equal(after, 2);
@@ -138,18 +168,20 @@ try {
   await page.evaluate(() => { window.proof.check('valid call changed visible UI: 4 → 2'); window.proof.line('EXECUTE category=fix → 2 release notes visible'); });
   await delay(3300);
 
-  const invalidResult = await page.evaluate(async () => {
+  const invalidResult = await page.evaluate(async (inputMode) => {
     const registered = (await document.modelContext.getTools()).find((item) => item.name === 'set_release_filter');
-    return document.modelContext.executeTool(registered, JSON.stringify({ category: 'private' }));
-  });
+    const args = { category: 'private' };
+    return document.modelContext.executeTool(registered, inputMode === 'object' ? args : JSON.stringify(args));
+  }, executeInputMode);
   assert.match(invalidResult, /^ERROR:/);
   assert.equal(await page.locator('article:visible').count(), 2);
   await page.evaluate(() => { window.proof.check('invalid enum returned bounded error; UI unchanged'); window.proof.line('INVALID category=private → ERROR (no UI side effect)'); });
   await delay(3000);
-  await page.evaluate(async () => {
+  await page.evaluate(async (inputMode) => {
     const registered = (await document.modelContext.getTools()).find((item) => item.name === 'set_release_filter');
-    return document.modelContext.executeTool(registered, JSON.stringify({ category: 'all' }));
-  });
+    const args = { category: 'all' };
+    return document.modelContext.executeTool(registered, inputMode === 'object' ? args : JSON.stringify(args));
+  }, executeInputMode);
   assert.equal(await page.locator('article:visible').count(), 4);
   await page.evaluate(() => { window.proof.check('cleanup restored all notes'); window.proof.line('CLEANUP category=all → fixture restored'); });
   await delay(3000);
@@ -177,7 +209,8 @@ try {
     await rename(generated, sourceVideo);
     console.log(`recorded ${sourceVideo}`);
   }
-  console.log(`proof verified in Chrome ${chromeVersion}: native getTools/executeTool, schema, annotations (consequentialHint omitted by this build), UI delta, bounded invalid input, cleanup`);
+  const consequentialState = tool.annotations.consequentialHint === undefined ? 'consequentialHint omitted' : 'consequentialHint exposed';
+  console.log(`proof verified in Chrome ${chromeVersion}: native getTools/executeTool (${executeInputMode} input), schema, annotations (${consequentialState}), UI delta, bounded invalid input, cleanup`);
 } finally {
   await browser?.close().catch(() => {});
   await new Promise((resolve) => server.close(resolve));
