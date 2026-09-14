@@ -1,6 +1,6 @@
 # ChatGPT client reality — Site tools
 
-Checked 2026-08-31 against the official OpenAI documentation:
+Checked 2026-09-14 against the official OpenAI documentation:
 <https://learn.chatgpt.com/docs/webmcp>. Re-check that page before publishing or
 relying on model/workspace availability; this UI is moving independently of the
 WebMCP draft and Chrome implementation.

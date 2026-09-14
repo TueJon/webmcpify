@@ -10,7 +10,7 @@ const source = readFileSync(join(root, 'skills/webmcpify/templates/webmcp-workbe
 const runnerSource = readFileSync(join(root, 'skills/webmcpify/scripts/workbench.mjs'), 'utf8');
 
 function loadApi(globals = {}) {
-  const sandbox = { globalThis: { ...globals }, Event };
+  const sandbox = { globalThis: { ...globals }, Event, AbortController, DOMException };
   sandbox.globalThis.globalThis = sandbox.globalThis;
   vm.runInNewContext(source, sandbox, { filename: 'webmcp-workbench.js' });
   return sandbox.globalThis.WebMCPifyWorkbench;
@@ -77,6 +77,31 @@ test('simulated context registers, enumerates, executes and aborts tools', async
   controller.abort();
   assert.equal((await context.getTools()).length, 0);
   assert.deepEqual(events, ['toolchange', 'toolchange']);
+});
+
+test('execute input probe distinguishes current object and legacy JSON-string browsers', async () => {
+  const api = loadApi({ crypto: { randomUUID: () => 'probe-id' } });
+  const makeContext = (mode) => {
+    let registered;
+    return {
+      async registerTool(tool, options) {
+        registered = tool;
+        options.signal.addEventListener('abort', () => { registered = undefined; }, { once: true });
+      },
+      async getTools() { return registered ? [{ name: registered.name }] : []; },
+      async executeTool(tool, input) {
+        if (mode === 'json-string' && typeof input !== 'string') {
+          throw new DOMException('Failed to parse input arguments', 'UnknownError');
+        }
+        return registered.execute(typeof input === 'string' ? JSON.parse(input) : input);
+      },
+    };
+  };
+  for (const mode of ['object', 'json-string']) {
+    const installed = { context: makeContext(mode), evidence: 'native', inputMode: null };
+    assert.equal(await api.detectExecuteInputMode(installed), mode);
+    assert.equal(await api.detectExecuteInputMode(installed), mode, 'the side-effect-free probe is cached');
+  }
 });
 
 test('simulated context rejects duplicate and malformed registrations', async () => {

@@ -25,10 +25,11 @@
  *
  * Full text: https://github.com/TueJon/webmcpify/blob/main/LICENSE
  *
- * Shared string/object compat helpers for the native-vs-stub I/O divergence.
+ * Shared string/object compat helpers for the native transition from JSON
+ * strings to JavaScript objects.
  * Used by templates/webmcp.spec.ts (inlined inside page.evaluate for the
  * browser-boundary parts) and tests/compat.test.mjs — single source of truth.
- * Collapse the string branch when Chrome aligns with the spec (#278/#279).
+ * Remove the JSON-string branch after Chrome 154 is no longer supported.
  */
 
 export function parseInputSchema(raw) {
@@ -36,14 +37,13 @@ export function parseInputSchema(raw) {
 }
 
 /**
- * Explicit adapter mode — no heuristics, no retry:
+ * Explicit adapter mode — capability-probe first, no retry of a real tool:
  * - stub via direct tool.execute(object) — headless-era stub
- * - stub via mc.executeTool(tool, object) — spec-shaped stub (RegisteredTool
- *   has no .execute); distinguished by explicit mc.__webmcpStubObjectMode set
- *   by the stub harness
- * - native mc.executeTool(tool, JSON string) — Chrome native (also when wrapped
- *   or with omitted inputSchema)
- * A handler TypeError never double-executes; collapse when spec norms.
+ * - current native/spec mc.executeTool(tool, object)
+ * - legacy Chrome mc.executeTool(tool, JSON string)
+ * The harness determines the native mode with a temporary side-effect-free
+ * tool before invoking application tools. A handler failure never triggers a
+ * retry, so a mutation cannot execute twice.
  */
 export function isStubTool(tool) {
   return typeof tool?.execute === 'function';

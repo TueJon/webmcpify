@@ -52,6 +52,8 @@ const PROFILE_DIR = requiredEnv('WEBMCP_PROFILE_DIR');
 
 let context: BrowserContext;
 let page: Page;
+type ExecuteInputMode = 'object' | 'json-string';
+let executeInputMode: ExecuteInputMode | undefined;
 
 test.beforeAll(async () => {
   context = await chromium.launchPersistentContext(PROFILE_DIR, {
@@ -66,7 +68,7 @@ test.afterAll(async () => {
   await context.close();
 });
 
-/** Enumerate registered tools; native returns STRINGIFIED JSON Schema, stubs may return object — handle both. */
+/** Enumerate registered tools; older native builds may stringify JSON Schema while current builds return objects — handle both. */
 async function listTools(p: Page): Promise<
   Array<{
     name: string;
@@ -86,13 +88,54 @@ async function listTools(p: Page): Promise<
 }
 
 /**
+ * Probe the browser contract with a temporary, side-effect-free tool. Chrome
+ * 150 requires JSON strings; the current CG draft and Chrome docs use objects.
+ * Real application tools are never retried to avoid duplicating mutations.
+ */
+async function detectExecuteInputMode(p: Page): Promise<ExecuteInputMode> {
+  return p.evaluate(async () => {
+    const mc = (document as any).modelContext;
+    if ((mc as any)?.__webmcpStubObjectMode) return 'object';
+    if (!mc?.registerTool || !mc?.getTools || !mc?.executeTool) {
+      throw new Error('No complete document.modelContext execution surface for capability probe');
+    }
+    const controller = new AbortController();
+    const name = `webmcpify_input_probe_${crypto.randomUUID().replaceAll('-', '')}`;
+    const probeState = { calls: 0 };
+    await mc.registerTool({
+      name,
+      description: 'Side-effect-free verification of the browser executeTool input contract.',
+      inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      async execute() { probeState.calls += 1; return 'webmcpify-input-probe'; },
+    }, { signal: controller.signal });
+    try {
+      const tool = (await mc.getTools()).find((candidate: { name: string }) => candidate.name === name);
+      if (!tool) throw new Error('WebMCP input-contract probe did not register');
+      try {
+        await mc.executeTool(tool, {});
+        if (Number(probeState.calls) !== 1) throw new Error('Object-input probe did not execute exactly once');
+        return 'object';
+      } catch (error) {
+        if (Number(probeState.calls) !== 0) throw error;
+        await mc.executeTool(tool, '{}');
+        if (Number(probeState.calls) !== 1) throw new Error('JSON-string input probe did not execute exactly once');
+        return 'json-string';
+      }
+    } finally {
+      controller.abort();
+    }
+  });
+}
+
+/**
  * Execute a tool. Contract (Chrome): resolves to a string result, or null when the
  * execution navigated; execution/validation failures REJECT — assert with
  * expect(...).rejects where a failure is the expected outcome.
  */
 async function executeTool(p: Page, name: string, args: object): Promise<string | null> {
+  executeInputMode ??= await detectExecuteInputMode(p);
   return p.evaluate(
-    async ({ name, args }) => {
+    async ({ name, args, inputMode }) => {
       // inline helpers: page.evaluate cannot close over outer imports — keep in sync with webmcp-compat.js
       const normalizeResult = (r: unknown) => (r == null ? null : typeof r === 'string' ? (r as string) : JSON.stringify(r));
       const mc = (document as any).modelContext;
@@ -100,19 +143,21 @@ async function executeTool(p: Page, name: string, args: object): Promise<string 
         const tools = await mc.getTools();
         const tool = tools.find((t: { name: string }) => t.name === name);
         if (!tool) throw new Error(`tool ${name} is not registered`);
-        // Explicit adapter mode — no heuristics, no retry:
+        // Explicit adapter mode — a harmless probe chose the native shape.
         // - tool.execute(object): headless-era stub
         // - mc.__webmcpStubObjectMode + mc.executeTool(tool, object): spec-shaped stub (enumerated tool has no .execute)
-        // - otherwise native mc.executeTool(tool, JSON string): Chrome (wrapped-safe, omitted-schema-safe)
+        // - current native/spec mc.executeTool(tool, object)
+        // - legacy Chrome mc.executeTool(tool, JSON string)
+        // Real tools are never retried: a handler failure may follow a mutation.
         if (typeof tool?.execute === 'function') return normalizeResult(await tool.execute(args));
         if (mc.executeTool) {
-          if ((mc as any).__webmcpStubObjectMode) return normalizeResult(await mc.executeTool(tool, args));
-          return normalizeResult(await mc.executeTool(tool, JSON.stringify(args)));
+          const input = inputMode === 'object' ? args : JSON.stringify(args);
+          return normalizeResult(await mc.executeTool(tool, input));
         }
       }
       throw new Error('No document.modelContext execution surface — insecure origin, headless/wrong Chrome, reused profile, or missing flag');
     },
-    { name, args },
+    { name, args, inputMode: executeInputMode },
   );
 }
 
@@ -141,6 +186,11 @@ test('verification origin is secure and WebMCP is available', async () => {
     probe.hasDocumentModelContext,
     'Use current headed Chrome, a dedicated profile, and enable chrome://flags/#enable-webmcp-testing',
   ).toBe(true);
+  executeInputMode = await detectExecuteInputMode(page);
+  test.info().annotations.push({
+    type: 'webmcp-compatibility',
+    description: `executeTool input mode: ${executeInputMode}`,
+  });
 });
 
 // ── Generated per manifest tool ──────────────────────────────────────────────

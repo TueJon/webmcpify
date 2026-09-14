@@ -6,6 +6,18 @@ reconstruct them from git history.
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-09-14
+
+- Updated verification for the CG draft and Chrome's 2026-09-11 execution
+  contract: `executeTool` now receives a JavaScript object, while Chrome 150's
+  deprecated JSON-string input remains supported through a temporary,
+  side-effect-free capability probe. Real application tools are invoked exactly
+  once, so a post-mutation handler failure cannot trigger a compatibility retry.
+- Kept current and older browser evidence comparable: the harness and visual
+  Workbench accept object or stringified enumerated schemas, and the native proof
+  records whether the browser exposes `consequentialHint` instead of pinning the
+  Chrome 150 omission.
+
 ## [0.5.0] — 2026-09-09
 
 - Added an agent-launched, dependency-free visual WebMCP Workbench with the
@@ -58,4 +70,5 @@ reconstruct them from git history.
 
 [0.4.0]: https://github.com/TueJon/webmcpify/releases/tag/v0.4.0
 [0.5.0]: https://github.com/TueJon/webmcpify/compare/v0.4.0...v0.5.0
-[Unreleased]: https://github.com/TueJon/webmcpify/compare/v0.5.0...HEAD
+[0.5.1]: https://github.com/TueJon/webmcpify/compare/v0.5.0...v0.5.1
+[Unreleased]: https://github.com/TueJon/webmcpify/compare/v0.5.1...HEAD
