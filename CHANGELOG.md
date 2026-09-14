@@ -6,6 +6,11 @@ reconstruct them from git history.
 
 ## [Unreleased]
 
+- Removed automatic unpinned guidance-package execution. Current official guides
+  are read without executing a package; optional CLI use requires an exact reviewed
+  version and user authorization. Scoped verification to dedicated target-app test
+  contexts, with local redacted evidence and explicit untrusted-content boundaries.
+
 ## [0.5.1] — 2026-09-14
 
 - Updated verification for the CG draft and Chrome's 2026-09-11 execution
