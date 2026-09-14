@@ -12,9 +12,9 @@ the skill's inventory, integration, heal, or audit phases.
 
 ## Reproduce the verification
 
-Requirements: Node 20+, dependencies from `npm ci`, Google Chrome 150+ (earlier
-releases do not expose the native `document.modelContext` surface and the run
-fails its first assertion), `xvfb-run`, and (for the derivative) ffmpeg. Chrome
+Requirements: Node 20+, dependencies from `npm ci`, a Chrome build exposing native
+`document.modelContext` with WebMCP enabled (measured on Chrome 150.0.7871.186;
+other versions require their own run), `xvfb-run`, and (for the derivative) ffmpeg. Chrome
 is located through Playwright's `chrome` channel; set `CHROME_BIN` to point at a
 specific binary. On a desktop session you can skip Xvfb and run
 `node proof/demo/run.mjs --verify` directly.
@@ -29,8 +29,9 @@ headed under Xvfb with `--enable-features=WebMCP,WebMCPTesting`, proves that no
 tool exists before the approval click and prepared tool registration, then:
 
 1. enumerates `set_release_filter` through native `document.modelContext.getTools()`;
-2. parses and compares its stringified schema and checks `readOnlyHint: false`;
-3. executes `{ "category": "fix" }` through native `executeTool()`;
+2. normalizes an object or stringified schema and checks `readOnlyHint: false`;
+3. probes object versus JSON-string input with a temporary side-effect-free tool,
+   then executes `{ "category": "fix" }` once through native `executeTool()`;
 4. checks the result string and the visible UI delta; and
 5. confirms an invalid enum resolves the runtime's bounded `ERROR:` convention
    without changing UI state.

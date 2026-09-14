@@ -89,7 +89,19 @@ apps under git, choose whether integration batches are committed). Beyond that i
 only comes back for things it genuinely can't resolve: an app that won't start, or
 a tool that still fails after capped heal attempts. All state persists in
 `.webmcpify/manifest.json`, so runs are **resumable** across sessions, context
-windows, and even different agents.
+windows, and even different agents. On resume, recorded app files, tool contracts,
+runtime and browser inputs determine which verification evidence remains valid.
+Changed or unknown dependencies require fresh checks; uncertain interrupted
+mutations must be reconciled through a read path before retrying. These records
+are skill-managed evidence, not an automatic dependency tracker or a WebMCP field.
+See [re-verification](skills/webmcpify/references/reverify.md).
+
+Verification uses a dedicated test context and approved origins, accounts and
+fixtures. Official guidance is read directly; running an optional guidance package
+requires an exact reviewed version and separate authorization. Mutation checks
+compare the intended effect with an independent read path and an unchanged
+neighbor or invariant. Optional model evals need approved data and explicit
+run, time and spend limits; a smoke pass does not establish journey quality.
 
 ## Built to scale to large codebases
 
