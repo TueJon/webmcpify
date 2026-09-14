@@ -1,5 +1,8 @@
 # Verify — proving every tool works in a real browser
 
+Before reusing a prior pass, apply [re-verification](reverify.md). After a
+successful check, record its inputs in the tool's `verifiedAgainst` field.
+
 ## Environment
 
 - **Current Chrome** (the API moved during the trial; verification probes

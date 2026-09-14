@@ -6,6 +6,10 @@ reconstruct them from git history.
 
 ## [Unreleased]
 
+- Added input-aware re-verification on resume: retain valid evidence, invalidate
+  affected tools after app/runtime/browser changes, and reconcile uncertain
+  interrupted mutations before retrying. Status remains read-only.
+
 - Removed automatic unpinned guidance-package execution. Current official guides
   are read without executing a package; optional CLI use requires an exact reviewed
   version and user authorization. Scoped verification to dedicated target-app test

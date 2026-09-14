@@ -110,7 +110,9 @@ Every phase is a **loop over persistent state**, not a one-shot pass:
   built and typechecked — committed per batch only if you opted in.
 - **Verify/Heal** iterate per tool with attempt caps and honest escalation
   instead of infinite loops; mutating tools get cleanup steps between retries.
-- Interrupt at any point; the next run resumes from the manifest.
+- Interrupt at any point; the next run resumes from the manifest. Verification
+  evidence records app, contract and browser inputs; changed inputs trigger
+  bounded re-verification, while `status` remains read-only.
 
 ## Guarantees
 
