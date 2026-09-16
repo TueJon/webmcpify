@@ -53,29 +53,51 @@ local. Use a new executionId for every authorized invocation, including invalid
 examples and cleanup actions that can mutate. Fingerprints identify attempts;
 they are not a server idempotency guarantee.
 
-1. Before any runner starts, scan **all tools**, regardless of terminal status,
-   for `started` entries. Serialize runners with an exclusive host-side manifest
-   lock. If another runner owns the lock, stop; never overwrite its journal.
-2. Reconcile unresolved entries through an independent authoritative read path
+1. Before any execution-capable runner scans or reads the manifest, open/create the
+   canonical `.webmcpify/manifest.lock` sidecar without replacing it and acquire a
+   blocking exclusive OS advisory lock on that file. Every runner for the target
+   repo must resolve the same canonical path. Hold the same locked file descriptor
+   through recovery, dispatch, reconciliation, settlement and the final manifest
+   directory fsync. Atomic replacement of `manifest.json` must never change the
+   lock identity. A bounded waiter may stop, but it must not read, write, reconcile
+   or dispatch before ownership is acquired.
+2. The successful OS-lock acquisition is the single atomic ownership transition.
+   After acquiring it, write and fsync diagnostic owner metadata into the still-locked
+   sidecar (random owner token, host, PID and process
+   start identity); never use that metadata, a PID probe, age or heartbeat as
+   permission to steal. Process death releases the kernel lock, so a successor may
+   overwrite stale metadata only **after** it acquires the same sidecar lock. Never
+   unlink, rename or recreate the sidecar during acquisition or recovery: that would
+   create a second lock identity and could bypass a live holder. If the platform or
+   filesystem cannot provide this invariant, mutation execution fails closed.
+3. Once ownership is acquired, scan **all tools**, regardless of terminal status,
+   for `started` entries. Acquisition serializes this scan with every journal write;
+   never inspect the manifest before the lock and then overwrite its journal.
+4. Reconcile unresolved entries through an independent authoritative read path
    using their original role/fixture/argument identity. Resolve required cleanup
    too. Unknown outcome or unverified cleanup blocks further mutation dispatch,
-   even with different arguments. A stale lock after a dead process may be
-   recovered only after confirming no runner remains; retain its started entries.
-3. Before each mutation dispatch, under the lock append a `started` entry and
+   even with different arguments. Retain every started entry during stale-owner
+   recovery.
+5. Before each mutation dispatch, under the lock append a `started` entry and
    durably replace the manifest (write a sibling temporary file, fsync it,
    atomic rename, fsync the directory). Verify the stored entry before calling
    the tool. Persistence failure means **do not dispatch**. Hold ownership through
    reconciliation; concurrent sessions must not race this protocol.
-4. After execution, independently establish the effect or proven absence of an
+6. After execution, independently establish the effect or proven absence of an
    effect, verify the expected/unchanged records and complete required cleanup.
    Only then atomically mark `reconciled` with outcome, timestamp and evidence.
    Keep the entry for audit; `verified` is a separate verdict requiring all checks.
    Timeouts, cancellation, exception, failed cleanup or process death leave
    `started` intact. Never clear it on an error handler or status reset.
-5. Cleanup that mutates needs its own pre-dispatch entry linked by
+7. Cleanup that mutates needs its own pre-dispatch entry linked by
    `parentExecutionId`. During recovery only the specifically reconciled cleanup
    action may bypass the unresolved-parent gate; uncertain cleanup itself must
    be read/reconciled before retry. Do not recursively schedule cleanup of cleanup.
+
+Before releasing ownership, durably settle every completed entry, fsync the
+manifest directory, optionally record `releasedAt` in the locked sidecar, then
+unlock/close it. A crash needs no sidecar deletion: the kernel releases ownership
+while the durable `started` entry remains for the next holder to reconcile.
 
 Apply this to VERIFY, HEAL retries, Playwright/Puppeteer harnesses, manual
 Workbench invocations and smoke/model evals. Disable runner-level retries and

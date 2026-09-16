@@ -158,7 +158,8 @@ Before using the spec template, Puppeteer, Workbench, smoke or model runners,
 read [the durable journal protocol](reverify.md#durable-mutation-execution-journal).
 The supplied browser/runtime helpers do not implement host persistence. Instrument
 all mutation dispatches and cleanup with its atomic pre-dispatch/settlement hooks,
-and disable automatic retries. A runner without such hooks is read-only for this
+acquire its stable sidecar OS lock before the initial manifest scan, and disable
+automatic retries. A runner without such hooks is read-only for this
 workflow; report mutation checks not-run. Reconcile existing started entries
 before selecting tools, including entries on verified/skipped tools.
 

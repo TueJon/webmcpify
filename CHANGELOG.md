@@ -13,7 +13,8 @@ reconstruct them from git history.
 
 - Added input-aware re-verification on resume: retain valid evidence, invalidate
   affected tools after app/runtime/browser changes, and reconcile uncertain
-  interrupted mutations before retrying. Status remains read-only.
+  interrupted mutations before retrying. A stable sidecar OS lock now serializes
+  scan-through-settlement across atomic manifest replacement. Status remains read-only.
 
 - Removed automatic unpinned guidance-package execution. Current official guides
   are read without executing a package; optional CLI use requires an exact reviewed
