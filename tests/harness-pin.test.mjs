@@ -4,7 +4,7 @@ import test from 'node:test';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('verification harness installs exact versions and never downloads at run time', () => {
+test('verification harness installs exact top-level versions and uses its local binary', () => {
   const verify = read('skills/webmcpify/references/verify.md');
   const installs = verify.split('\n').filter((line) => /\bnpm (i|install)\b/.test(line));
   assert.ok(installs.length > 0, 'verify.md documents the harness install');

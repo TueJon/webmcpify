@@ -10,7 +10,8 @@ reconstruct them from git history.
 
 - Pinned the verification harness install to the versions the skill is tested with
   (`@playwright/test` matching the Workbench's Playwright) and run its local binary
-  instead of `npx`, so verification never downloads an unreviewed package.
+  instead of `npx`, preventing version drift in the direct harness dependencies and
+  package downloads when the harness runs.
 
 ## [0.6.0] — 2026-09-19
 
