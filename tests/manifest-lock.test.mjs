@@ -172,6 +172,31 @@ test('runner B cannot scan while runner A journals, cleans up, settles, and rele
   }
 });
 
+test('a bounded waiter times out without acquiring or leaking the lock later', {
+  skip: requiresAdvisoryLock,
+  timeout: 10_000,
+}, async () => {
+  const paths = await fixture();
+  let holder;
+  let successor;
+  try {
+    holder = await openMutationJournal({ manifestPath: paths.manifestPath });
+    await assert.rejects(
+      openMutationJournal({ manifestPath: paths.manifestPath, timeoutMs: 100 }),
+      /timed out after 100ms/,
+    );
+    await holder.close();
+    holder = undefined;
+
+    successor = await openMutationJournal({ manifestPath: paths.manifestPath, timeoutMs: 1_000 });
+    assert.deepEqual(successor.unresolved, []);
+  } finally {
+    await holder?.close();
+    await successor?.close();
+    await rm(paths.directory, { recursive: true, force: true });
+  }
+});
+
 test('lockf -k fallback keeps the sidecar inode and excludes a second runner', {
   skip: process.platform === 'win32' || (!hasCommand('lockf') && !hasCommand('flock'))
     ? 'requires native lockf(1), or flock(1) for the Linux lockf compatibility shim'

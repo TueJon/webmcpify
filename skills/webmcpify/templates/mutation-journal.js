@@ -134,13 +134,21 @@ async function writeOwnerMetadata(lockPath, metadata) {
   }
 }
 async function startCandidate(candidate, lockPath, timeoutMs) {
-  const child = spawn(candidate.command, candidate.args(lockPath), { stdio: ["pipe", "pipe", "pipe"] });
+  const child = spawn(candidate.command, candidate.args(lockPath), {
+    detached: true,
+    stdio: ["pipe", "pipe", "pipe"]
+  });
   return new Promise((resolve, reject) => {
     let stdout = "";
     let stderr = "";
     let settled = false;
     const timer = timeoutMs === void 0 ? void 0 : setTimeout(() => {
-      child.kill("SIGTERM");
+      try {
+        process.kill(-child.pid, "SIGTERM");
+      } catch (error) {
+        if (error.code !== "ESRCH") throw error;
+      }
+      child.stdin.destroy();
       finishReject(new Error(`timed out after ${timeoutMs}ms waiting for ${lockPath}`));
     }, timeoutMs);
     const cleanup = () => {

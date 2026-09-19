@@ -213,13 +213,24 @@ async function startCandidate(
   lockPath: string,
   timeoutMs?: number,
 ): Promise<ChildProcessWithoutNullStreams> {
-  const child = spawn(candidate.command, candidate.args(lockPath), { stdio: ['pipe', 'pipe', 'pipe'] });
+  // Give the advisory-lock utility and its holder command one process group.
+  // A timed-out waiter must terminate both; killing only the utility can leave
+  // its child alive to acquire and retain the lock after the caller has failed.
+  const child = spawn(candidate.command, candidate.args(lockPath), {
+    detached: true,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
   return new Promise((resolve, reject) => {
     let stdout = '';
     let stderr = '';
     let settled = false;
     const timer = timeoutMs === undefined ? undefined : setTimeout(() => {
-      child.kill('SIGTERM');
+      try {
+        process.kill(-child.pid!, 'SIGTERM');
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+      }
+      child.stdin.destroy();
       finishReject(new Error(`timed out after ${timeoutMs}ms waiting for ${lockPath}`));
     }, timeoutMs);
 

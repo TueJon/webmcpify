@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   check:
-    runs-on: [self-hosted, Linux, X64, twb-ci]
+    runs-on: [self-hosted, Linux, X64, tuejon-ci]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
