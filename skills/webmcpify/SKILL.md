@@ -159,6 +159,8 @@ Manifest schema (Webmcpify Manifest v4):
 ```jsonc
 {
   "webmcpify": 4,
+  // Omit until the helper's first execution-capable open; it then writes and preserves this UUID.
+  "mutationLockIdentity": "2d734e2d-1537-41a7-b8b5-0af6e932019e",
   "app": { "stack": "react-vite", "typescript": true, "entry": "src/main.tsx",
            "baseUrl": "https://app.example.test", "startCommand": "npm run dev",
            "verificationOrigin": "https://app.example.test",

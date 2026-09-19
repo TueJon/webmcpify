@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { access, chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { access, chmod, link, mkdir, mkdtemp, readFile, rename, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -59,6 +59,22 @@ function mutation(overrides = {}) {
   };
 }
 
+function journalEntry(overrides = {}) {
+  return {
+    executionId: 'execution-parent',
+    tool: 'send_contact_message',
+    contractRevision: 1,
+    origin: 'https://app.example.test',
+    role: 'member',
+    fixtureRevision: 'seed-v2',
+    argumentsFingerprint: fingerprintArguments({ email: 'qa@example.test' }),
+    startedAt: '2026-09-19T12:00:00.000Z',
+    state: 'started',
+    evidence: '.webmcpify/evidence/contact-message.json',
+    ...overrides,
+  };
+}
+
 async function delay(ms) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -86,6 +102,20 @@ async function waitForExit(child) {
   }
   const result = await new Promise((resolve) => child.once('exit', (code, signal) => resolve({ code, signal })));
   return { ...result, stderr };
+}
+
+async function waitForOwnerMetadata(lockPath, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const metadata = JSON.parse(await readFile(lockPath, 'utf8'));
+      if (Number.isInteger(metadata.pid) && typeof metadata.lockBackend === 'string') return metadata;
+    } catch (error) {
+      if (error.code !== 'ENOENT' && !(error instanceof SyntaxError)) throw error;
+    }
+    await delay(1);
+  }
+  throw new Error(`timed out waiting for owner metadata in ${lockPath}`);
 }
 
 test('argument fingerprints use recursively sorted canonical JSON', () => {
@@ -205,7 +235,7 @@ test('a bounded waiter times out without acquiring or leaking the lock later', {
   }
 });
 
-test('lockf -k fallback keeps the sidecar inode and excludes a second runner', {
+test('lockf descriptor fallback keeps the sidecar inode and excludes a second runner', {
   skip: process.platform === 'win32' || (!hasCommand('lockf') && !hasCommand('flock'))
     ? 'requires native lockf(1), or flock(1) for the Linux lockf compatibility shim'
     : false,
@@ -221,11 +251,12 @@ test('lockf -k fallback keeps the sidecar inode and excludes a second runner', {
     const nativeFlock = commandPath('flock');
     const shim = `#!${process.execPath}\n`
       + `import { spawnSync } from 'node:child_process';\n`
-      + `const [keep, lockPath, command, ...args] = process.argv.slice(2);\n`
-      + `if (keep !== '-k') process.exit(64);\n`
-      + `const result = spawnSync(${JSON.stringify(nativeFlock)}, ['--exclusive', lockPath, command, ...args], { stdio: 'inherit' });\n`
+      + `const args = process.argv.slice(2);\n`
+      + `const nonblock = args.includes('-t');\n`
+      + `if (args.at(-1) !== '3') process.exit(64);\n`
+      + `const result = spawnSync(${JSON.stringify(nativeFlock)}, ['--exclusive', ...(nonblock ? ['--nonblock'] : []), '3'], { stdio: ['inherit', 'inherit', 'inherit', 3] });\n`
       + `if (result.error) throw result.error;\n`
-      + `process.exit(result.status ?? 1);\n`;
+      + `process.exit(nonblock && result.status === 1 ? 75 : result.status ?? 1);\n`;
     await writeFile(join(bin, 'lockf'), shim, { mode: 0o700 });
   }
 
@@ -340,6 +371,7 @@ test('opening a legacy manifest initializes journals and invalidates historical 
   const journal = await openMutationJournal({ manifestPath: paths.manifestPath });
   try {
     const stored = JSON.parse(await readFile(paths.manifestPath, 'utf8'));
+    assert.equal(typeof stored.mutationLockIdentity, 'string');
     assert.equal(stored.tools[0].status, 'integrated');
     assert.equal(stored.tools[0].verifiedAgainst, null);
     assert.deepEqual(stored.tools[0].mutationExecutions, []);
@@ -352,11 +384,220 @@ test('opening a legacy manifest initializes journals and invalidates historical 
   }
 });
 
+test('present malformed journals fail closed without rewriting the manifest', {
+  skip: requiresAdvisoryLock,
+}, async (t) => {
+  const cases = [
+    ['non-array', { executionId: 'uncertain', state: 'started' }],
+    ['malformed entry', [{ executionId: 'uncertain', state: 'started' }]],
+    ['unknown state', [journalEntry({ state: 'unknown' })]],
+    ['duplicate execution IDs', [journalEntry(), journalEntry()]],
+    ['missing parent', [journalEntry({ executionId: 'cleanup', parentExecutionId: 'missing' })]],
+    ['cleanup parent owned by another tool', [journalEntry({ executionId: 'cleanup', parentExecutionId: 'other-parent' })]],
+  ];
+  for (const [name, mutationExecutions] of cases) {
+    await t.test(name, async () => {
+      const tools = [{
+        id: 'send_contact_message',
+        status: 'integrated',
+        contractRevision: 1,
+        mutationExecutions,
+        verifiedAgainst: null,
+      }];
+      if (name === 'cleanup parent owned by another tool') {
+        tools.push({
+          id: 'other_tool',
+          status: 'integrated',
+          contractRevision: 1,
+          mutationExecutions: [journalEntry({ executionId: 'other-parent', tool: 'other_tool' })],
+          verifiedAgainst: null,
+        });
+      }
+      const paths = await fixture(manifest(tools));
+      const before = await readFile(paths.manifestPath, 'utf8');
+      try {
+        await assert.rejects(openMutationJournal({ manifestPath: paths.manifestPath }));
+        assert.equal(await readFile(paths.manifestPath, 'utf8'), before);
+      } finally {
+        await rm(paths.directory, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+test('the runner descriptor retains ownership through startup, dispatch, settlement and release', {
+  skip: requiresAdvisoryLock,
+  timeout: 10_000,
+}, async () => {
+  const paths = await fixture();
+  const journal = await openMutationJournal({ manifestPath: paths.manifestPath });
+  let successor;
+  try {
+    const metadata = JSON.parse(await readFile(paths.lockPath, 'utf8'));
+    assert.equal(metadata.pid, process.pid);
+    assert.equal(typeof metadata.lockBackend, 'string');
+    assert.equal(Object.hasOwn(metadata, 'lockHolderPid'), false, 'no killable holder owns the lock');
+
+    await assert.rejects(
+      openMutationJournal({ manifestPath: paths.manifestPath, timeoutMs: 50 }),
+      /timed out after 50ms/,
+      'startup must remain excluded after the acquisition subprocess exits',
+    );
+    const execution = await journal.beforeDispatch(mutation());
+    await assert.rejects(
+      openMutationJournal({ manifestPath: paths.manifestPath, timeoutMs: 50 }),
+      /timed out after 50ms/,
+      'dispatch must remain excluded',
+    );
+    await journal.settle(execution.executionId, { outcome: 'verified', evidence: 'verified.json' });
+    await assert.rejects(
+      openMutationJournal({ manifestPath: paths.manifestPath, timeoutMs: 50 }),
+      /timed out after 50ms/,
+      'settlement must remain excluded',
+    );
+    await journal.close();
+    successor = await openMutationJournal({ manifestPath: paths.manifestPath, timeoutMs: 1_000 });
+    assert.deepEqual(successor.unresolved, []);
+  } finally {
+    await journal.close().catch(() => undefined);
+    await successor?.close();
+    await rm(paths.directory, { recursive: true, force: true });
+  }
+});
+
+test('runner death during startup releases ownership without a partial manifest rewrite', {
+  skip: requiresAdvisoryLock,
+  timeout: 15_000,
+}, async () => {
+  const tools = Array.from({ length: 150_000 }, (_, index) => ({
+    id: `tool_${index}`,
+    status: 'verified',
+    contractRevision: 1,
+    verifiedAgainst: { at: '2026-09-14T12:00:00Z' },
+  }));
+  const paths = await fixture(manifest(tools));
+  const before = await readFile(paths.manifestPath, 'utf8');
+  const childSource = `
+    import { openMutationJournal } from ${JSON.stringify(helperUrl)};
+    try {
+      const journal = await openMutationJournal({ manifestPath: process.env.MANIFEST });
+      await journal.close();
+      process.exit(2);
+    } catch (error) {
+      console.error(error.message);
+      process.exit(3);
+    }
+  `;
+  const child = spawn(process.execPath, ['--input-type=module', '--eval', childSource], {
+    env: { ...process.env, MANIFEST: paths.manifestPath },
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
+  let recovery;
+  try {
+    const metadata = await waitForOwnerMetadata(paths.lockPath);
+    process.kill(metadata.pid, 'SIGKILL');
+    const result = await waitForExit(child);
+    assert.equal(result.signal, 'SIGKILL', result.stderr);
+    const current = await readFile(paths.manifestPath, 'utf8');
+    assert.ok(current === before || JSON.parse(current).tools.every((tool) => Array.isArray(tool.mutationExecutions)));
+    recovery = await openMutationJournal({ manifestPath: paths.manifestPath, timeoutMs: 3_000 });
+    assert.deepEqual(recovery.unresolved, []);
+  } finally {
+    if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+    await recovery?.close();
+    await rm(paths.directory, { recursive: true, force: true });
+  }
+});
+
+test('symlink and multiply-linked sidecars are rejected without touching their targets', {
+  skip: process.platform === 'win32',
+}, async (t) => {
+  await t.test('symlink', async () => {
+    const paths = await fixture();
+    const victim = join(paths.directory, 'victim');
+    await writeFile(victim, 'do not touch');
+    await symlink(victim, paths.lockPath);
+    try {
+      await assert.rejects(openMutationJournal({ manifestPath: paths.manifestPath }), /ELOOP|symbolic link/);
+      assert.equal(await readFile(victim, 'utf8'), 'do not touch');
+    } finally {
+      await rm(paths.directory, { recursive: true, force: true });
+    }
+  });
+  await t.test('hard link', async () => {
+    const paths = await fixture();
+    const victim = join(paths.directory, 'victim');
+    await writeFile(victim, 'do not touch');
+    await link(victim, paths.lockPath);
+    try {
+      await assert.rejects(openMutationJournal({ manifestPath: paths.manifestPath }), /exactly one link/);
+      assert.equal(await readFile(victim, 'utf8'), 'do not touch');
+    } finally {
+      await rm(paths.directory, { recursive: true, force: true });
+    }
+  });
+});
+
+test('a sidecar swap during acquisition cannot establish a second lock identity', {
+  skip: process.platform === 'win32' || !hasCommand('flock') ? 'requires flock(1)' : false,
+  timeout: 10_000,
+}, async () => {
+  const paths = await fixture();
+  const before = await readFile(paths.manifestPath, 'utf8');
+  const nativeFlock = commandPath('flock');
+  const bin = join(paths.directory, 'bin');
+  await mkdir(bin);
+  const shim = '#!/bin/sh\n'
+    + '/bin/mv "$WEBMCPIFY_TEST_LOCK_PATH" "$WEBMCPIFY_TEST_LOCK_PATH.displaced"\n'
+    + ': > "$WEBMCPIFY_TEST_LOCK_PATH"\n'
+    + 'exec "$WEBMCPIFY_NATIVE_FLOCK" "$@"\n';
+  await writeFile(join(bin, 'flock'), shim, { mode: 0o700 });
+  const originalPath = process.env.PATH;
+  const originalLockPath = process.env.WEBMCPIFY_TEST_LOCK_PATH;
+  const originalFlock = process.env.WEBMCPIFY_NATIVE_FLOCK;
+  try {
+    process.env.PATH = bin;
+    process.env.WEBMCPIFY_TEST_LOCK_PATH = paths.lockPath;
+    process.env.WEBMCPIFY_NATIVE_FLOCK = nativeFlock;
+    await assert.rejects(openMutationJournal({ manifestPath: paths.manifestPath }), /identity changed/);
+    assert.equal(await readFile(paths.manifestPath, 'utf8'), before);
+  } finally {
+    process.env.PATH = originalPath;
+    if (originalLockPath === undefined) delete process.env.WEBMCPIFY_TEST_LOCK_PATH;
+    else process.env.WEBMCPIFY_TEST_LOCK_PATH = originalLockPath;
+    if (originalFlock === undefined) delete process.env.WEBMCPIFY_NATIVE_FLOCK;
+    else process.env.WEBMCPIFY_NATIVE_FLOCK = originalFlock;
+    await rm(paths.directory, { recursive: true, force: true });
+  }
+});
+
+test('a live sidecar replacement cannot admit a second operational journal', {
+  skip: requiresAdvisoryLock,
+  timeout: 10_000,
+}, async () => {
+  const paths = await fixture();
+  const runnerA = await openMutationJournal({ manifestPath: paths.manifestPath });
+  try {
+    await rename(paths.lockPath, `${paths.lockPath}.displaced`);
+    await writeFile(paths.lockPath, '');
+    await assert.rejects(
+      openMutationJournal({ manifestPath: paths.manifestPath, timeoutMs: 1_000 }),
+      /lost its stable identity/,
+    );
+    await assert.rejects(runnerA.beforeDispatch(mutation()), /lock identity changed/);
+    const stored = JSON.parse(await readFile(paths.manifestPath, 'utf8'));
+    assert.deepEqual(stored.tools[0].mutationExecutions, []);
+  } finally {
+    await runnerA.close().catch(() => undefined);
+    await rm(paths.directory, { recursive: true, force: true });
+  }
+});
+
 test('the portable helper retains both supported advisory-lock backends', async () => {
   const source = await readFile(join(root, 'skills/webmcpify/templates/mutation-journal.js'), 'utf8');
   assert.match(source, /command: "flock"/);
   assert.match(source, /command: "lockf"/);
-  assert.match(source, /\["-k", lockPath/);
+  assert.match(source, /\["-s", "3"\]/);
 });
 
 test('the Playwright template journals every mutating example and cleanup action', async () => {

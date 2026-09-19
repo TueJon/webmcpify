@@ -168,10 +168,13 @@ manifest read, `beforeDispatch` immediately before every mutation (invalid examp
 and cleanup included), and `settle` only after the effect or proven absence plus
 cleanup has been independently established. Keep the journal open until the final
 settlement and disable automatic retries. The helper uses `flock(1)` where present,
-falls back to macOS/FreeBSD `lockf(1) -k` without replacing the sidecar, and fails
+falls back to macOS/FreeBSD `lockf(1)` descriptor mode without replacing the sidecar, and fails
 closed if neither command is available. A runner that cannot expose these hooks is
 read-only for this workflow; report mutation checks not-run. Reconcile existing
 started entries before selecting tools, including entries on verified/skipped tools.
+Do not repair a malformed journal or sidecar in place: the helper deliberately
+rejects corrupt entries, symlinks, hard links and lock-identity changes without
+authorizing a mutation.
 
 ## Agent evals (recommended; required evidence for SaaS-scale readiness claims)
 

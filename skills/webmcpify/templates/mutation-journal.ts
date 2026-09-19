@@ -22,9 +22,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { open, readFile, realpath, rename, rm, stat } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { lstat, open, readFile, realpath, rename, rm, stat, type FileHandle } from 'node:fs/promises';
 import { hostname } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 
@@ -81,35 +82,40 @@ interface ManifestTool extends JsonObject {
 }
 
 interface Manifest extends JsonObject {
+  mutationLockIdentity?: string;
   tools: ManifestTool[];
 }
 
 interface LockCandidate {
   command: string;
-  args(lockPath: string): string[];
+  args(): string[];
+  probeArgs(): string[];
+  busyExitCode: number;
 }
 
-const HOLDER_SOURCE = String.raw`
-process.stdin.setEncoding('utf8');
-process.stdout.write('WEBMCPIFY_LOCK_READY\n');
-let pending = '';
-process.stdin.on('data', (chunk) => {
-  pending += chunk;
-  if (pending.includes('\n')) process.exit(pending.startsWith('RELEASE\n') ? 0 : 2);
-});
-process.stdin.on('end', () => process.exit(0));
-`;
+interface LockIdentity {
+  dev: number;
+  ino: number;
+}
 
 const LOCK_CANDIDATES: LockCandidate[] = [
   {
     command: 'flock',
-    args: (lockPath) => ['--exclusive', lockPath, process.execPath, '--input-type=module', '--eval', HOLDER_SOURCE],
+    // fd 3 is inherited from the already verified parent handle. This prevents
+    // a pathname swap between validation and advisory-lock acquisition. flock's
+    // descriptor lock belongs to the shared open-file description, so it stays
+    // held by this runner after the short acquisition subprocess exits.
+    args: () => ['--exclusive', '3'],
+    probeArgs: () => ['--exclusive', '--nonblock', '3'],
+    busyExitCode: 1,
   },
   {
     command: 'lockf',
-    // macOS/FreeBSD lockf removes a pathname on exit unless -k is used. The
-    // sidecar inode is permanent, so -k is a correctness requirement.
-    args: (lockPath) => ['-k', lockPath, process.execPath, '--input-type=module', '--eval', HOLDER_SOURCE],
+    // macOS/FreeBSD lockf's descriptor form uses BSD flock(2) locking and
+    // implies -k, so it neither opens by pathname nor removes the sidecar.
+    args: () => ['-s', '3'],
+    probeArgs: () => ['-s', '-t', '0', '3'],
+    busyExitCode: 75,
   },
 ];
 
@@ -139,28 +145,30 @@ export function fingerprintArguments(value: unknown): string {
   return `sha256:${createHash('sha256').update(canonicalJson(value)).digest('hex')}`;
 }
 
-async function syncDirectory(path: string): Promise<void> {
-  const handle = await open(path, 'r');
+type OwnedStep = <T>(operation: () => Promise<T>) => Promise<T>;
+
+async function syncDirectory(path: string, step: OwnedStep): Promise<void> {
+  const handle = await step(() => open(path, 'r'));
   try {
-    await handle.sync();
+    await step(() => handle.sync());
   } finally {
     await handle.close();
   }
 }
 
-async function durableReplace(manifestPath: string, manifest: Manifest): Promise<void> {
+async function durableReplace(manifestPath: string, manifest: Manifest, step: OwnedStep): Promise<void> {
   const directory = dirname(manifestPath);
   const temporary = join(directory, `.${basename(manifestPath)}.${process.pid}.${randomUUID()}.tmp`);
-  const mode = (await stat(manifestPath)).mode & 0o777;
+  const mode = (await step(() => stat(manifestPath))).mode & 0o777;
   let handle;
   try {
-    handle = await open(temporary, 'wx', mode);
-    await handle.writeFile(`${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
-    await handle.sync();
-    await handle.close();
+    handle = await step(() => open(temporary, 'wx', mode));
+    await step(() => handle!.writeFile(`${JSON.stringify(manifest, null, 2)}\n`, 'utf8'));
+    await step(() => handle!.sync());
+    await step(() => handle!.close());
     handle = undefined;
-    await rename(temporary, manifestPath);
-    await syncDirectory(directory);
+    await step(() => rename(temporary, manifestPath));
+    await syncDirectory(directory, step);
   } catch (error) {
     await handle?.close().catch(() => undefined);
     await rm(temporary, { force: true }).catch(() => undefined);
@@ -175,104 +183,211 @@ async function readManifest(manifestPath: string): Promise<Manifest> {
 }
 
 function unresolvedEntries(manifest: Manifest): MutationExecution[] {
-  return manifest.tools.flatMap((tool) =>
-    Array.isArray(tool.mutationExecutions)
-      ? tool.mutationExecutions.filter((entry) => entry?.state === 'started')
-      : [],
-  );
+  validateJournals(manifest);
+  return manifest.tools.flatMap((tool) => tool.mutationExecutions!
+    .filter((entry) => entry.state === 'started'));
 }
 
-async function migrateManifest(manifestPath: string, manifest: Manifest): Promise<Manifest> {
-  let changed = false;
-  for (const tool of manifest.tools) {
+function validateJournals(manifest: Manifest): void {
+  const toolIds = new Set<string>();
+  const executions = new Map<string, { entry: MutationExecution; owner: ManifestTool }>();
+  for (const [toolIndex, tool] of manifest.tools.entries()) {
+    if (!tool || typeof tool !== 'object' || Array.isArray(tool)) {
+      throw new Error(`manifest tool ${toolIndex} must be an object`);
+    }
+    const toolId = requireText(typeof tool.id === 'string' ? tool.id : '', `manifest tool ${toolIndex} id`);
+    if (toolIds.has(toolId)) throw new Error(`duplicate manifest tool id: ${toolId}`);
+    toolIds.add(toolId);
     if (!Array.isArray(tool.mutationExecutions)) {
+      throw new Error(`mutationExecutions must be an array for manifest tool: ${toolId}`);
+    }
+    for (const [entryIndex, candidate] of tool.mutationExecutions.entries()) {
+      if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+        throw new Error(`mutation execution ${toolId}[${entryIndex}] must be an object`);
+      }
+      const entry = candidate as MutationExecution;
+      const label = `mutation execution ${toolId}[${entryIndex}]`;
+      requireText(typeof entry.executionId === 'string' ? entry.executionId : '', `${label} executionId`);
+      requireText(typeof entry.tool === 'string' ? entry.tool : '', `${label} tool`);
+      if (!Number.isInteger(entry.contractRevision) || entry.contractRevision < 1) {
+        throw new Error(`${label} contractRevision must be a positive integer`);
+      }
+      for (const field of ['origin', 'role', 'fixtureRevision', 'argumentsFingerprint', 'startedAt', 'evidence'] as const) {
+        requireText(typeof entry[field] === 'string' ? entry[field] : '', `${label} ${field}`);
+      }
+      if (entry.state !== 'started' && entry.state !== 'reconciled') {
+        throw new Error(`${label} has unknown state: ${String(entry.state)}`);
+      }
+      if (entry.parentExecutionId !== undefined) {
+        requireText(typeof entry.parentExecutionId === 'string' ? entry.parentExecutionId : '', `${label} parentExecutionId`);
+      }
+      if (entry.state === 'reconciled') {
+        requireText(typeof entry.outcome === 'string' ? entry.outcome : '', `${label} outcome`);
+        requireText(typeof entry.reconciledAt === 'string' ? entry.reconciledAt : '', `${label} reconciledAt`);
+      }
+      if (executions.has(entry.executionId)) {
+        throw new Error(`duplicate mutation executionId: ${entry.executionId}`);
+      }
+      executions.set(entry.executionId, { entry, owner: tool });
+    }
+  }
+  for (const { entry, owner } of executions.values()) {
+    if (!entry.parentExecutionId) continue;
+    const parent = executions.get(entry.parentExecutionId);
+    if (!parent || parent.owner !== owner || parent.entry.parentExecutionId) {
+      throw new Error(`invalid parentExecutionId for mutation execution: ${entry.executionId}`);
+    }
+  }
+}
+
+async function migrateManifest(
+  manifestPath: string,
+  manifest: Manifest,
+  lockIdentity: string,
+  step: OwnedStep,
+): Promise<Manifest> {
+  let changed = false;
+  if (!Object.hasOwn(manifest, 'mutationLockIdentity')) {
+    manifest.mutationLockIdentity = lockIdentity;
+    changed = true;
+  } else if (manifest.mutationLockIdentity !== lockIdentity) {
+    throw new Error('manifest mutationLockIdentity does not match the locked sidecar');
+  }
+  for (const [toolIndex, tool] of manifest.tools.entries()) {
+    if (!tool || typeof tool !== 'object' || Array.isArray(tool)) {
+      throw new Error(`manifest tool ${toolIndex} must be an object`);
+    }
+    if (!Object.hasOwn(tool, 'mutationExecutions')) {
       tool.mutationExecutions = [];
       tool.verifiedAgainst = null;
       if (tool.status === 'verified') tool.status = 'integrated';
       changed = true;
     }
   }
-  if (changed) await durableReplace(manifestPath, manifest);
+  validateJournals(manifest);
+  if (changed) await durableReplace(manifestPath, manifest, step);
   return manifest;
 }
 
-async function writeOwnerMetadata(lockPath: string, metadata: JsonObject): Promise<void> {
-  const handle = await open(lockPath, 'r+');
+async function writeOwnerMetadata(handle: FileHandle, metadata: JsonObject, step: OwnedStep): Promise<void> {
+  const serialized = `${JSON.stringify(metadata)}\n`;
+  await step(() => handle.truncate(0));
+  await step(() => handle.write(serialized, 0, 'utf8').then(() => undefined));
+  await step(() => handle.sync());
+}
+
+async function readOwnerMetadata(handle: FileHandle, step: OwnedStep): Promise<JsonObject> {
+  const size = (await step(() => handle.stat())).size;
+  if (size === 0) return {};
+  const buffer = Buffer.alloc(size);
+  const { bytesRead } = await step(() => handle.read(buffer, 0, size, 0));
+  let value: unknown;
   try {
-    await handle.truncate(0);
-    await handle.writeFile(`${JSON.stringify(metadata)}\n`, 'utf8');
-    await handle.sync();
-  } finally {
-    await handle.close();
+    value = JSON.parse(buffer.subarray(0, bytesRead).toString('utf8'));
+  } catch {
+    throw new Error('manifest.lock contains malformed owner metadata');
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('manifest.lock owner metadata must be an object');
+  }
+  return value as JsonObject;
+}
+
+async function openLockFile(lockPath: string): Promise<{ handle: FileHandle; identity: LockIdentity }> {
+  const handle = await open(lockPath, constants.O_CREAT | constants.O_RDWR | constants.O_NOFOLLOW, 0o600);
+  try {
+    const info = await handle.stat();
+    if (!info.isFile() || info.nlink !== 1) {
+      throw new Error('manifest.lock must be a regular file with exactly one link');
+    }
+    const pathInfo = await lstat(lockPath);
+    if (!pathInfo.isFile() || pathInfo.isSymbolicLink() || pathInfo.nlink !== 1
+      || pathInfo.dev !== info.dev || pathInfo.ino !== info.ino) {
+      throw new Error('manifest.lock identity changed while opening');
+    }
+    return { handle, identity: { dev: info.dev, ino: info.ino } };
+  } catch (error) {
+    await handle.close().catch(() => undefined);
+    throw error;
   }
 }
 
-async function startCandidate(
+async function runLockCommand(
   candidate: LockCandidate,
+  args: string[],
+  lockHandle: FileHandle,
   lockPath: string,
   timeoutMs?: number,
-): Promise<ChildProcessWithoutNullStreams> {
-  // Give the advisory-lock utility and its holder command one process group.
-  // A timed-out waiter must terminate both; killing only the utility can leave
-  // its child alive to acquire and retain the lock after the caller has failed.
-  const child = spawn(candidate.command, candidate.args(lockPath), {
+): Promise<{ code: number | null; signal: NodeJS.Signals | null; stderr: string }> {
+  const child = spawn(candidate.command, args, {
     detached: true,
-    stdio: ['pipe', 'pipe', 'pipe'],
+    stdio: ['ignore', 'ignore', 'pipe', lockHandle.fd],
   });
-  return new Promise((resolve, reject) => {
-    let stdout = '';
-    let stderr = '';
-    let settled = false;
-    const timer = timeoutMs === undefined ? undefined : setTimeout(() => {
-      try {
-        process.kill(-child.pid!, 'SIGTERM');
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
-      }
-      child.stdin.destroy();
-      finishReject(new Error(`timed out after ${timeoutMs}ms waiting for ${lockPath}`));
-    }, timeoutMs);
-
-    const cleanup = () => {
-      if (timer) clearTimeout(timer);
-      child.off('error', onError);
-      child.off('exit', onExit);
-      child.stdout.off('data', onStdout);
-      child.stderr.off('data', onStderr);
-    };
-    const finishReject = (error: Error) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      reject(error);
-    };
-    const onError = (error: NodeJS.ErrnoException) => finishReject(error);
-    const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
-      finishReject(new Error(
-        `${candidate.command} exited before lock acquisition (${code ?? signal ?? 'unknown'}): ${stderr.trim()}`,
-      ));
-    };
-    const onStdout = (chunk: Buffer) => {
-      stdout += chunk.toString('utf8');
-      if (!stdout.includes('WEBMCPIFY_LOCK_READY\n') || settled) return;
-      settled = true;
-      cleanup();
-      resolve(child);
-    };
-    const onStderr = (chunk: Buffer) => { stderr += chunk.toString('utf8'); };
-
-    child.once('error', onError);
-    child.once('exit', onExit);
-    child.stdout.on('data', onStdout);
-    child.stderr.on('data', onStderr);
-  });
+  let stderr = '';
+  child.stderr?.setEncoding('utf8');
+  child.stderr?.on('data', (chunk) => { stderr += chunk; });
+  const exit = waitForChildExit(child);
+  let timer: NodeJS.Timeout | undefined;
+  const timedOut = Symbol('timed-out');
+  const result = await (timeoutMs === undefined
+    ? exit
+    : Promise.race([
+      exit,
+      new Promise<typeof timedOut>((resolve) => { timer = setTimeout(() => resolve(timedOut), timeoutMs); }),
+    ]));
+  if (timer) clearTimeout(timer);
+  if (result === timedOut) {
+    try {
+      process.kill(-child.pid!, 'SIGTERM');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+    }
+    await exit.catch(() => undefined);
+    throw new Error(`timed out after ${timeoutMs}ms waiting for ${lockPath}`);
+  }
+  return { ...result, stderr };
 }
 
-async function acquireLock(lockPath: string, timeoutMs?: number): Promise<ChildProcessWithoutNullStreams> {
+async function verifyLockHeld(
+  candidate: LockCandidate,
+  lockPath: string,
+  identity: LockIdentity,
+): Promise<void> {
+  const probe = await openLockFile(lockPath);
+  try {
+    if (probe.identity.dev !== identity.dev || probe.identity.ino !== identity.ino) {
+      throw new Error('manifest.lock identity changed after lock acquisition');
+    }
+    const result = await runLockCommand(candidate, candidate.probeArgs(), probe.handle, lockPath);
+    if (result.code !== candidate.busyExitCode) {
+      throw new Error(
+        `${candidate.command} descriptor lock did not remain held by the runner `
+        + `(${result.code ?? result.signal ?? 'unknown'}): ${result.stderr.trim()}`,
+      );
+    }
+  } finally {
+    await probe.handle.close().catch(() => undefined);
+  }
+}
+
+async function acquireLock(
+  lockHandle: FileHandle,
+  lockPath: string,
+  lockIdentity: LockIdentity,
+  timeoutMs?: number,
+): Promise<LockCandidate> {
   const unavailable: string[] = [];
   for (const candidate of LOCK_CANDIDATES) {
     try {
-      return await startCandidate(candidate, lockPath, timeoutMs);
+      const result = await runLockCommand(candidate, candidate.args(), lockHandle, lockPath, timeoutMs);
+      if (result.code !== 0) {
+        throw new Error(
+          `${candidate.command} exited before lock acquisition `
+          + `(${result.code ?? result.signal ?? 'unknown'}): ${result.stderr.trim()}`,
+        );
+      }
+      await verifyLockHeld(candidate, lockPath, lockIdentity);
+      return candidate;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         unavailable.push(candidate.command);
@@ -286,60 +401,115 @@ async function acquireLock(lockPath: string, timeoutMs?: number): Promise<ChildP
   );
 }
 
+function waitForChildExit(
+  child: ChildProcess,
+): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve({ code: child.exitCode, signal: child.signalCode });
+  }
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      child.off('error', onError);
+      child.off('exit', onExit);
+    };
+    const onError = (error: Error) => { cleanup(); reject(error); };
+    const onExit = (code: number | null, signal: NodeJS.Signals | null) => {
+      cleanup();
+      resolve({ code, signal });
+    };
+    child.once('error', onError);
+    child.once('exit', onExit);
+    if (child.exitCode !== null || child.signalCode !== null) {
+      onExit(child.exitCode, child.signalCode);
+    }
+  });
+}
+
 export class MutationJournal {
   readonly manifestPath: string;
   readonly lockPath: string;
   readonly ownerToken: string;
-  #holder: ChildProcessWithoutNullStreams | undefined;
+  readonly lockBackend: string;
+  #lockHandle: FileHandle | undefined;
+  #lockIdentity: LockIdentity;
+  #stableLockIdentity = '';
   #closed = false;
-  #lockFailure: Error | undefined;
   #unresolved: MutationExecution[];
 
   private constructor(
     manifestPath: string,
     lockPath: string,
     ownerToken: string,
-    holder: ChildProcessWithoutNullStreams,
+    lockHandle: FileHandle,
+    lockIdentity: LockIdentity,
+    lockBackend: string,
     unresolved: MutationExecution[],
   ) {
     this.manifestPath = manifestPath;
     this.lockPath = lockPath;
     this.ownerToken = ownerToken;
-    this.#holder = holder;
+    this.lockBackend = lockBackend;
+    this.#lockHandle = lockHandle;
+    this.#lockIdentity = lockIdentity;
     this.#unresolved = unresolved;
-    holder.once('error', (error) => {
-      if (!this.#closed) this.#lockFailure = new Error(`mutation journal lock holder failed: ${error.message}`);
-    });
-    holder.once('exit', (code, signal) => {
-      if (!this.#closed) {
-        this.#lockFailure = new Error(
-          `mutation journal lock holder exited unexpectedly (${code ?? signal ?? 'unknown'})`,
-        );
-      }
-    });
   }
 
   static async open(options: OpenMutationJournalOptions): Promise<MutationJournal> {
     const manifestPath = await realpath(options.manifestPath);
     const manifestDirectory = dirname(manifestPath);
     const lockPath = join(manifestDirectory, 'manifest.lock');
-    const lockFile = await open(lockPath, 'a', 0o600);
-    await lockFile.close();
-
-    const holder = await acquireLock(lockPath, options.timeoutMs);
+    const { handle: lockHandle, identity: lockIdentity } = await openLockFile(lockPath);
+    let journal: MutationJournal | undefined;
     const ownerToken = randomUUID();
     try {
-      await writeOwnerMetadata(lockPath, {
+      const candidate = await acquireLock(lockHandle, lockPath, lockIdentity, options.timeoutMs);
+      journal = new MutationJournal(
+        manifestPath,
+        lockPath,
+        ownerToken,
+        lockHandle,
+        lockIdentity,
+        candidate.command,
+        [],
+      );
+      const manifest = await journal.#ownedStep(() => readManifest(manifestPath));
+      const ownerMetadata = await readOwnerMetadata(lockHandle, journal.#ownedStep);
+      const manifestIdentity = manifest.mutationLockIdentity;
+      const sidecarIdentity = ownerMetadata.lockIdentity;
+      if (manifestIdentity !== undefined && (typeof manifestIdentity !== 'string' || !manifestIdentity.trim())) {
+        throw new Error('manifest mutationLockIdentity must be a non-empty string');
+      }
+      if (sidecarIdentity !== undefined && (typeof sidecarIdentity !== 'string' || !sidecarIdentity.trim())) {
+        throw new Error('manifest.lock lockIdentity must be a non-empty string');
+      }
+      if (manifestIdentity && !sidecarIdentity) {
+        throw new Error('manifest.lock lost its stable identity; refusing a replacement sidecar');
+      }
+      if (manifestIdentity && sidecarIdentity && manifestIdentity !== sidecarIdentity) {
+        throw new Error('manifest.lock stable identity does not match the manifest');
+      }
+      journal.#stableLockIdentity = manifestIdentity ?? sidecarIdentity as string | undefined ?? randomUUID();
+      await writeOwnerMetadata(lockHandle, {
+        lockIdentity: journal.#stableLockIdentity,
         ownerToken,
         host: hostname(),
         pid: process.pid,
+        lockBackend: candidate.command,
         processStartedAt: new Date(Date.now() - process.uptime() * 1_000).toISOString(),
         acquiredAt: new Date().toISOString(),
-      });
-      const manifest = await migrateManifest(manifestPath, await readManifest(manifestPath));
-      return new MutationJournal(manifestPath, lockPath, ownerToken, holder, unresolvedEntries(manifest));
+      }, journal.#ownedStep);
+      const migrated = await migrateManifest(
+        manifestPath,
+        manifest,
+        journal.#stableLockIdentity,
+        journal.#ownedStep,
+      );
+      journal.#unresolved = unresolvedEntries(migrated);
+      await journal.#checkOwnership();
+      return journal;
     } catch (error) {
-      holder.stdin.end('RELEASE\n');
+      if (journal) await journal.#releaseLock().catch(() => undefined);
+      else await lockHandle.close().catch(() => undefined);
       throw error;
     }
   }
@@ -349,7 +519,7 @@ export class MutationJournal {
   }
 
   async beforeDispatch(input: BeforeDispatchInput): Promise<MutationExecution> {
-    this.#assertOpen();
+    await this.#checkOwnership();
     requireText(input.tool, 'tool');
     requireText(input.origin, 'origin');
     requireText(input.role, 'role');
@@ -359,7 +529,8 @@ export class MutationJournal {
       throw new Error('contractRevision must be a positive integer');
     }
 
-    const manifest = await readManifest(this.manifestPath);
+    const manifest = await this.#ownedStep(() => readManifest(this.manifestPath));
+    validateJournals(manifest);
     const unresolved = unresolvedEntries(manifest);
     const manifestTool = input.manifestTool ?? input.tool;
     const owner = manifest.tools.find((tool) => tool.id === manifestTool);
@@ -393,9 +564,10 @@ export class MutationJournal {
       ...(input.parentExecutionId ? { parentExecutionId: input.parentExecutionId } : {}),
     };
     owner.mutationExecutions.push(execution);
-    await durableReplace(this.manifestPath, manifest);
+    await durableReplace(this.manifestPath, manifest, this.#ownedStep);
 
-    const stored = await readManifest(this.manifestPath);
+    const stored = await this.#ownedStep(() => readManifest(this.manifestPath));
+    validateJournals(stored);
     const persisted = stored.tools
       .find((tool) => tool.id === manifestTool)
       ?.mutationExecutions?.find((entry) => entry.executionId === execution.executionId);
@@ -403,16 +575,18 @@ export class MutationJournal {
       throw new Error(`pre-dispatch journal entry was not durably persisted: ${execution.executionId}`);
     }
     this.#unresolved = unresolvedEntries(stored);
+    await this.#checkOwnership();
     return structuredClone(execution);
   }
 
   async settle(executionId: string, input: SettlementInput): Promise<MutationExecution> {
-    this.#assertOpen();
+    await this.#checkOwnership();
     requireText(executionId, 'executionId');
     requireText(input.outcome, 'outcome');
     requireText(input.evidence, 'evidence');
 
-    const manifest = await readManifest(this.manifestPath);
+    const manifest = await this.#ownedStep(() => readManifest(this.manifestPath));
+    validateJournals(manifest);
     const owner = manifest.tools.find((tool) =>
       tool.mutationExecutions?.some((entry) => entry.executionId === executionId),
     );
@@ -432,44 +606,70 @@ export class MutationJournal {
     execution.outcome = input.outcome;
     execution.reconciledAt = input.reconciledAt ?? new Date().toISOString();
     execution.evidence = input.evidence;
-    await durableReplace(this.manifestPath, manifest);
-    this.#unresolved = unresolvedEntries(await readManifest(this.manifestPath));
+    await durableReplace(this.manifestPath, manifest, this.#ownedStep);
+    const stored = await this.#ownedStep(() => readManifest(this.manifestPath));
+    validateJournals(stored);
+    this.#unresolved = unresolvedEntries(stored);
+    await this.#checkOwnership();
     return structuredClone(execution);
   }
 
   async close(): Promise<void> {
     if (this.#closed) return;
-    this.#closed = true;
-    const holder = this.#holder;
-    this.#holder = undefined;
-    if (!holder) return;
-    if (this.#lockFailure || holder.exitCode !== null || holder.signalCode !== null) {
-      throw this.#lockFailure ?? new Error('mutation journal lock holder exited before release');
-    }
-
-    let syncError: unknown;
+    let failure: unknown;
     try {
-      await syncDirectory(dirname(this.manifestPath));
+      if (!failure) {
+        await syncDirectory(dirname(this.manifestPath), this.#ownedStep);
+        await writeOwnerMetadata(this.#lockHandle!, {
+          lockIdentity: this.#stableLockIdentity,
+          ownerToken: this.ownerToken,
+          host: hostname(),
+          pid: process.pid,
+          releasedAt: new Date().toISOString(),
+        }, this.#ownedStep);
+      }
     } catch (error) {
-      syncError = error;
+      failure = error;
     }
-    const exit = new Promise<void>((resolve, reject) => {
-      holder.once('error', reject);
-      holder.once('exit', (code, signal) => {
-        if (code === 0) resolve();
-        else reject(new Error(`lock holder exited while releasing (${code ?? signal ?? 'unknown'})`));
-      });
-    });
-    holder.stdin.end('RELEASE\n');
-    await exit;
-    if (syncError) throw syncError;
+    try {
+      await this.#releaseLock();
+    } catch (error) {
+      failure ??= error;
+    }
+    if (failure) throw failure;
   }
 
-  #assertOpen(): void {
-    if (this.#closed || !this.#holder) throw new Error('mutation journal is closed');
-    if (this.#lockFailure || this.#holder.exitCode !== null || this.#holder.signalCode !== null) {
-      throw this.#lockFailure ?? new Error('mutation journal lock ownership was lost');
+  readonly #ownedStep: OwnedStep = async <T>(operation: () => Promise<T>): Promise<T> => {
+    await this.#checkOwnership();
+    const result = await operation();
+    await this.#checkOwnership();
+    return result;
+  };
+
+  async #checkOwnership(): Promise<void> {
+    if (this.#closed || !this.#lockHandle) {
+      throw new Error('mutation journal is closed');
     }
+    const [handleInfo, pathInfo] = await Promise.all([
+      this.#lockHandle.stat(),
+      lstat(this.lockPath),
+    ]);
+    if (!handleInfo.isFile() || handleInfo.nlink !== 1 || !pathInfo.isFile()
+      || pathInfo.isSymbolicLink() || pathInfo.nlink !== 1
+      || handleInfo.dev !== this.#lockIdentity.dev || handleInfo.ino !== this.#lockIdentity.ino
+      || pathInfo.dev !== this.#lockIdentity.dev || pathInfo.ino !== this.#lockIdentity.ino) {
+      throw new Error('mutation journal lock identity changed');
+    }
+  }
+
+  async #releaseLock(): Promise<void> {
+    if (this.#closed) return;
+    const lockHandle = this.#lockHandle;
+    this.#lockHandle = undefined;
+    let failure: unknown;
+    await lockHandle?.close().catch((error) => { failure ??= error; });
+    this.#closed = true;
+    if (failure) throw failure;
   }
 }
 
