@@ -6,7 +6,7 @@ reconstruct them from git history.
 
 ## [Unreleased]
 
-## [0.6.0] — 2026-09-14
+## [0.6.0] — 2026-09-19
 
 - Tightened eval execution with reviewed versions, bounded runs and approved data;
   added independent mutation-effect checks and React/Svelte lifecycle acceptance.
