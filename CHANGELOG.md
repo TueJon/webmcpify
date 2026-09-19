@@ -6,6 +6,22 @@ reconstruct them from git history.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-09-19
+
+- Added a dependency-free host-side mutation journal for verification runners.
+  It acquires the permanent manifest sidecar through `flock(1)` or macOS/FreeBSD
+  `lockf(1)` descriptor mode, migrates missing journals, and fails closed when no supported
+  advisory lock is available. A stable manifest/sidecar identity plus inode,
+  link and journal validation reject replacement or corrupt safety state.
+- Wired the Playwright template's valid, invalid and cleanup mutation examples
+  through durable pre-dispatch and settlement hooks. Atomic manifest replacement
+  now writes and fsyncs a sibling temporary file, renames it, and fsyncs the
+  directory while the sidecar lock remains held.
+- Added regressions for two-runner exclusion, cleanup linkage, pre-dispatch
+  persistence failure, runner death with a retained `started` entry,
+  malformed journals, sidecar attacks, canonical argument fingerprints, and
+  legacy-manifest migration.
+
 ## [0.6.1] — 2026-09-19
 
 - Pinned the verification harness install to the versions the skill is tested with
@@ -95,4 +111,5 @@ reconstruct them from git history.
 [0.5.1]: https://github.com/TueJon/webmcpify/compare/v0.5.0...v0.5.1
 [0.6.0]: https://github.com/TueJon/webmcpify/compare/v0.5.1...v0.6.0
 [0.6.1]: https://github.com/TueJon/webmcpify/compare/v0.6.0...v0.6.1
-[Unreleased]: https://github.com/TueJon/webmcpify/compare/v0.6.1...HEAD
+[0.7.0]: https://github.com/TueJon/webmcpify/compare/v0.6.1...v0.7.0
+[Unreleased]: https://github.com/TueJon/webmcpify/compare/v0.7.0...HEAD

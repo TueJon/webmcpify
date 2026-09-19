@@ -164,7 +164,9 @@ tool count alone is never called 100%.
 | 🔒 | **Read-only first** | Server mutations need your explicit per-tool approval; auth, signup, billing, payment and credential-returning tools stay excluded; irreversible deletes can only open the app's own confirmation UI |
 | 🛡️ | **Your server stays the trust boundary** | Tools only call code paths your UI already uses — no new endpoints, no bypasses |
 | 📦 | **Zero dependencies** | A small MIT runtime is vendored and feature-detected; the app behaves the same in browsers without WebMCP |
+| 🚦 | **No ambiguous imperative results** | The runtime rejects accidental bare `null` / `undefined`; route-changing tools return a structured result before navigation and route-scope disposal |
 | 🧪 | **Exercised, not assumed** | Every tool runs in real Chrome against the result and the UI state; mutations are confirmed through an independent read path with an unchanged neighbor; declarative forms get the real submit click |
+| 📝 | **Crash-safe mutation checks** | A dependency-free host helper journals dispatches and cleanups, settles verified outcomes atomically, and serializes runners through an advisory-lock sidecar on Linux and macOS/FreeBSD |
 | ♻️ | **Honest resume** | Changed files, contracts, runtimes or browsers invalidate the evidence they affect, unknown dependencies mean a full re-check, and interrupted mutations are reconciled before any retry ([re-verification](skills/webmcpify/references/reverify.md)) |
 | 🔐 | **Scoped access** | A dedicated test context with approved origins, accounts and fixtures; official guidance is read directly, never executed as an unreviewed package |
 | 🧭 | **Spec over scoreboard** | Checker findings are classified, not chased; the public discovery layer (`/.well-known/webmcp`) is a separate approval |
@@ -211,7 +213,7 @@ and a troubleshooting order. Release-by-release spec adaptations are in the
 |---|---|
 | [`skills/webmcpify/SKILL.md`](skills/webmcpify/SKILL.md) | The pipeline your agent follows |
 | [`skills/webmcpify/references/`](skills/webmcpify/references/) | Phase guides: inventory, integrate, Workbench, runtime, verify, re-verify, heal, security, discovery, client surfaces |
-| [`skills/webmcpify/templates/`](skills/webmcpify/templates/) | Vendorable runtime (TS + JS), temporary visual Workbench, ambient types, Playwright verification template, discovery manifest |
+| [`skills/webmcpify/templates/`](skills/webmcpify/templates/) | Vendorable runtime (TS + JS), durable mutation journal, temporary visual Workbench, ambient types, Playwright verification template, discovery manifest |
 | [`proof/`](proof/README.md) | Reproducible native-Chrome proof: fixture, manifests, recording, checksums |
 
 ## Related projects
