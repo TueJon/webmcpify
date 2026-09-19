@@ -350,3 +350,12 @@ test('the portable helper retains both supported advisory-lock backends', async 
   assert.match(source, /command: "lockf"/);
   assert.match(source, /\["-k", lockPath/);
 });
+
+test('the Playwright template journals every mutating example and cleanup action', async () => {
+  const source = await readFile(join(root, 'skills/webmcpify/templates/webmcp.spec.ts'), 'utf8');
+  assert.equal(source.match(/mutationJournal!\.beforeDispatch\(/g)?.length, 3);
+  assert.equal(source.match(/mutationJournal!\.settle\(/g)?.length, 3);
+  assert.match(source, /parentExecutionId: execution\.executionId/);
+  assert.match(source, /independent read path proves the mutation before cleanup/);
+  assert.match(source, /independent read path proves absence of an effect/);
+});

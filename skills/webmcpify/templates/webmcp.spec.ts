@@ -337,6 +337,7 @@ test.describe('send_contact_message', () => {
     });
     await page.goto(`${BASE_URL}/admin/messages`); // manifest: cleanup read path
     const fixtureRow = page.getByRole('row', { name: /qa@example\.test/ });
+    await expect(fixtureRow).toHaveCount(1); // independent read path proves the mutation before cleanup
     await fixtureRow.getByRole('button', { name: 'Delete' }).click();
     await expect(fixtureRow).toHaveCount(0); // independently prove cleanup
     await mutationJournal!.settle(cleanup.executionId, {
