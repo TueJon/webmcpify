@@ -11,7 +11,9 @@ permissions:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # The runner lives on VD-FW next to production keys: never run fork code there.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, Linux, X64, tuejon-ci]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
