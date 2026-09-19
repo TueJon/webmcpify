@@ -127,6 +127,8 @@ test('runner B cannot scan while runner A journals, cleans up, settles, and rele
     runnerA = await openMutationJournal({ manifestPath: paths.manifestPath });
     const stableLockInode = (await stat(paths.lockPath)).ino;
     const parent = await runnerA.beforeDispatch(mutation());
+    const preDispatchStored = JSON.parse(await readFile(paths.manifestPath, 'utf8'));
+    assert.deepEqual(preDispatchStored.tools[0].mutationExecutions[0], parent);
 
     let runnerBAcquired = false;
     const runnerBPromise = openMutationJournal({ manifestPath: paths.manifestPath })

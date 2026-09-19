@@ -399,7 +399,7 @@ export class MutationJournal {
     const persisted = stored.tools
       .find((tool) => tool.id === manifestTool)
       ?.mutationExecutions?.find((entry) => entry.executionId === execution.executionId);
-    if (!persisted || persisted.state !== 'started') {
+    if (!persisted || JSON.stringify(persisted) !== JSON.stringify(execution)) {
       throw new Error(`pre-dispatch journal entry was not durably persisted: ${execution.executionId}`);
     }
     this.#unresolved = unresolvedEntries(stored);
