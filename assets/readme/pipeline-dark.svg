@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 410" role="img" aria-labelledby="t d">
+  <title id="t">The webmcpify pipeline</title>
+  <desc id="d">Detect, inventory, human approval of the tool manifest, integrate, verify in real Chrome, heal failures with capped retries, audit. Every phase reads and writes .webmcpify/manifest.json.</desc>
+  <style>
+    .sans{font-family:'Familjen Grotesk','Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif} .mono{font-family:'Spline Sans Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace}
+    .ink{fill:#eeedf5} .muted{fill:#a4a2b7} .pink{fill:#c3b6ff}
+    .line{fill:none;stroke:#eeedf5;stroke-width:1.5}
+    .flow{fill:none;stroke:#a492fb;stroke-width:2}
+    .head{fill:#a492fb}
+  </style>
+  <rect x="0.75" y="0.75" width="998.5" height="408.5" rx="16" fill="#12111c" stroke="#2c2a3b" stroke-width="1.5"/>
+  <text x="32" y="46" class="mono muted" font-size="12.5" letter-spacing="1.6">FIG. 2 — THE PIPELINE</text>
+  <text x="968" y="46" text-anchor="end" class="mono muted" font-size="12.5">↻ loops over persisted state</text>
+  <line x1="32" y1="62" x2="968" y2="62" stroke="#3a3850" stroke-width="1"/>
+  <rect x="28" y="158" width="116" height="48" rx="24" fill="#0d0c15" stroke="#eeedf5" stroke-width="1.6"/>
+  <text x="86" y="187" text-anchor="middle" class="mono" font-size="13.5" font-weight="700" letter-spacing="0.4" fill="#eeedf5">DETECT</text>
+  <text x="86" y="234" text-anchor="middle" class="sans muted" font-size="13">stack, routes,</text>
+  <text x="86" y="252" text-anchor="middle" class="sans muted" font-size="13">auth and state</text>
+  <line x1="86" y1="290" x2="86" y2="318" stroke="#a492fb" stroke-width="1.2" stroke-dasharray="3 4"/>
+  <line x1="147" y1="182" x2="162" y2="182" class="flow"/><path class="head" d="M164 182 l-9 -4.5 v9 z"/>
+  <rect x="166" y="158" width="116" height="48" rx="24" fill="#0d0c15" stroke="#eeedf5" stroke-width="1.6"/>
+  <text x="224" y="187" text-anchor="middle" class="mono" font-size="13.5" font-weight="700" letter-spacing="0.4" fill="#eeedf5">INVENTORY</text>
+  <text x="224" y="234" text-anchor="middle" class="sans muted" font-size="13">reads area by area,</text>
+  <text x="224" y="252" text-anchor="middle" class="sans muted" font-size="13">proposes a tool</text>
+  <text x="224" y="270" text-anchor="middle" class="sans muted" font-size="13">manifest</text>
+  <line x1="224" y1="290" x2="224" y2="318" stroke="#a492fb" stroke-width="1.2" stroke-dasharray="3 4"/>
+  <line x1="285" y1="182" x2="300" y2="182" class="flow"/><path class="head" d="M302 182 l-9 -4.5 v9 z"/>
+  <path class="flow" d="M258 155 C258 124 190 124 190 150"/><path class="head" d="M190 156 l-4.5 -9 h9 z"/>
+  <text x="224" y="116" text-anchor="middle" class="mono pink" font-size="12">↻ per area</text>
+  <rect x="304" y="158" width="116" height="48" rx="24" fill="#7a58ea" stroke="#7a58ea" stroke-width="1.6"/>
+  <text x="362" y="187" text-anchor="middle" class="mono" font-size="13.5" font-weight="700" letter-spacing="0.4" fill="#ffffff">YOU APPROVE</text>
+  <text x="362" y="234" text-anchor="middle" class="sans muted" font-size="13">names, schemas,</text>
+  <text x="362" y="252" text-anchor="middle" class="sans muted" font-size="13">read-only or</text>
+  <text x="362" y="270" text-anchor="middle" class="sans muted" font-size="13">mutating — per tool</text>
+  <line x1="362" y1="290" x2="362" y2="318" stroke="#a492fb" stroke-width="1.2" stroke-dasharray="3 4"/>
+  <line x1="423" y1="182" x2="438" y2="182" class="flow"/><path class="head" d="M440 182 l-9 -4.5 v9 z"/>
+  <text x="362" y="140" text-anchor="middle" class="mono pink" font-size="12" font-weight="700">◆ human gate</text>
+  <rect x="442" y="158" width="116" height="48" rx="24" fill="#0d0c15" stroke="#eeedf5" stroke-width="1.6"/>
+  <text x="500" y="187" text-anchor="middle" class="mono" font-size="13.5" font-weight="700" letter-spacing="0.4" fill="#eeedf5">INTEGRATE</text>
+  <text x="500" y="234" text-anchor="middle" class="sans muted" font-size="13">vendored runtime,</text>
+  <text x="500" y="252" text-anchor="middle" class="sans muted" font-size="13">built + typechecked</text>
+  <line x1="500" y1="290" x2="500" y2="318" stroke="#a492fb" stroke-width="1.2" stroke-dasharray="3 4"/>
+  <line x1="561" y1="182" x2="576" y2="182" class="flow"/><path class="head" d="M578 182 l-9 -4.5 v9 z"/>
+  <path class="flow" d="M534 155 C534 124 466 124 466 150"/><path class="head" d="M466 156 l-4.5 -9 h9 z"/>
+  <text x="500" y="116" text-anchor="middle" class="mono pink" font-size="12">↻ per batch</text>
+  <rect x="580" y="158" width="116" height="48" rx="24" fill="#0d0c15" stroke="#eeedf5" stroke-width="1.6"/>
+  <text x="638" y="187" text-anchor="middle" class="mono" font-size="13.5" font-weight="700" letter-spacing="0.4" fill="#eeedf5">VERIFY</text>
+  <text x="638" y="234" text-anchor="middle" class="sans muted" font-size="13">real Chrome:</text>
+  <text x="638" y="252" text-anchor="middle" class="sans muted" font-size="13">result + UI state</text>
+  <line x1="638" y1="290" x2="638" y2="318" stroke="#a492fb" stroke-width="1.2" stroke-dasharray="3 4"/>
+  <line x1="699" y1="182" x2="714" y2="182" class="flow"/><path class="head" d="M716 182 l-9 -4.5 v9 z"/>
+  <rect x="718" y="158" width="116" height="48" rx="24" fill="#0d0c15" stroke="#eeedf5" stroke-width="1.6"/>
+  <text x="776" y="187" text-anchor="middle" class="mono" font-size="13.5" font-weight="700" letter-spacing="0.4" fill="#eeedf5">HEAL</text>
+  <text x="776" y="234" text-anchor="middle" class="sans muted" font-size="13">fixes only that</text>
+  <text x="776" y="252" text-anchor="middle" class="sans muted" font-size="13">tool, capped</text>
+  <line x1="776" y1="290" x2="776" y2="318" stroke="#a492fb" stroke-width="1.2" stroke-dasharray="3 4"/>
+  <line x1="837" y1="182" x2="852" y2="182" class="flow"/><path class="head" d="M854 182 l-9 -4.5 v9 z"/>
+  <rect x="856" y="158" width="116" height="48" rx="24" fill="#0d0c15" stroke="#eeedf5" stroke-width="1.6"/>
+  <text x="914" y="187" text-anchor="middle" class="mono" font-size="13.5" font-weight="700" letter-spacing="0.4" fill="#eeedf5">AUDIT</text>
+  <text x="914" y="234" text-anchor="middle" class="sans muted" font-size="13">every diff hunk</text>
+  <text x="914" y="252" text-anchor="middle" class="sans muted" font-size="13">maps to the manifest</text>
+  <line x1="914" y1="290" x2="914" y2="318" stroke="#a492fb" stroke-width="1.2" stroke-dasharray="3 4"/>
+  <path class="flow" d="M768 155 C762 112 652 112 646 150"/><path class="head" d="M646 156 l-4.5 -9 h9 z"/>
+  <text x="707" y="106" text-anchor="middle" class="mono pink" font-size="12">↻ re-verify, capped</text>
+  <rect x="32" y="318" width="936" height="64" rx="12" fill="#1d1930" stroke="#a492fb" stroke-width="1.2"/>
+  <path d="M52 334 h14 l7 7 v23 h-21 z M66 334 v7 h7" fill="none" stroke="#c3b6ff" stroke-width="1.5" stroke-linejoin="round"/>
+  <text x="88" y="346" class="mono pink" font-size="15" font-weight="700">.webmcpify/manifest.json</text>
+  <text x="88" y="368" class="sans muted" font-size="13">single source of truth — every phase reads and writes it</text>
+  <text x="948" y="346" text-anchor="end" class="sans ink" font-size="13.5">✓ resumes across sessions, context windows and agents</text>
+  <text x="948" y="368" text-anchor="end" class="sans muted" font-size="13">✓ keeps verification evidence per tool</text>
+</svg>
