@@ -42,8 +42,13 @@ the evidence even when frontend files did not change.
 
 Manifest v4 adds `mutationExecutions: []` on each tool. This is a required
 workflow journal for new mutation runs, not a browser API or an automatic feature
-of the vendored runtime. Before using a runner, implement its Node/host-side
-pre-dispatch and settlement hooks; a browser-only callback is not durable.
+of the vendored runtime. Vendor `templates/mutation-journal.{ts,js}` next to the
+spec and use its Node/host-side `openMutationJournal`, `beforeDispatch`, `settle`
+and `close` operations; a browser-only callback is not durable. The helper prefers
+`flock(1)`, falls back to macOS/FreeBSD `lockf(1) -k` (which keeps the sidecar
+inode), and fails closed when neither advisory-lock command is available. Other
+runners must adapt dispatch through these same hooks rather than reproduce the
+locking and durability protocol.
 
 Each entry has `executionId`, `tool`, `contractRevision`, `origin`, `role`,
 `fixtureRevision`, `argumentsFingerprint` (SHA-256 of canonical JSON with sorted

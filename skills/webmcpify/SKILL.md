@@ -28,8 +28,8 @@ DETECT ──▶ INVENTORY ──▶ [HUMAN GATE: manifest approval] ──▶ I
 
 Everything you need ships inside this skill directory: phase guides in
 `references/`, and vendorable code in `templates/` (runtime, ambient types,
-JS variant, React JSX typings, verification spec + compat helper). Never assume files exist
-outside the skill dir.
+JS variant, React JSX typings, verification spec, compatibility helper and
+durable mutation journal). Never assume files exist outside the skill dir.
 
 **Out of scope** (stop and say so): backend-only MCP servers (that's classic MCP,
 not WebMCP), automating third-party sites you don't control, and generic SEO work.
@@ -185,7 +185,7 @@ Manifest schema (Webmcpify Manifest v4):
     },
     "setup": {                     // PATHS created/modified per one-time setup step ([] = not done yet)
       "runtimeVendored": ["src/webmcp/webmcpify.ts", "src/webmcp/webmcp.d.ts"],
-      "harnessInstalled": [".webmcpify/webmcp.spec.ts", ".webmcpify/webmcp-compat.js"],
+      "harnessInstalled": [".webmcpify/webmcp.spec.ts", ".webmcpify/webmcp-compat.js", ".webmcpify/mutation-journal.ts", ".webmcpify/mutation-journal.js"],
       "originTrialNoted": ["README.md"]
     },
     "discovery": null,             // optional off-page layer (references/discovery.md). Stays null unless
@@ -407,12 +407,13 @@ and removes it within the same inspection session.
 
 ## Phase 3 — VERIFY (loop)
 
-Set up once from `templates/webmcp.spec.ts` per `references/verify.md` (real headed
-Chrome; current production `document.modelContext.getTools()`/`executeTool()` surface).
+Set up once from `templates/webmcp.spec.ts` plus the shipped host-side
+`templates/mutation-journal.{ts,js}` per `references/verify.md` (real headed Chrome;
+current production `document.modelContext.getTools()`/`executeTool()` surface).
 Before any execution, enforce the durable mutation journal in
 `references/reverify.md`: scan unresolved attempts, persist each mutation before
-dispatch, and settle only after independent reconciliation and cleanup. Wire the
-host-side hooks into the chosen runner; without them, mutations are blocked.
+dispatch, and settle only after independent reconciliation and cleanup. Use its
+hooks in the chosen runner; without them, mutations are blocked.
 Then loop over every `integrated` tool, using its manifest `route`, `auth`,
 `examples`, `expect`, and `annotations` fields:
 

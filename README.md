@@ -147,6 +147,10 @@ Every phase is a **loop over persistent state**, not a one-shot pass:
   examples recorded in the manifest. That includes mutating declarative forms,
   where Chrome pauses the execution until a real submit interaction — the
   harness performs that submit click mid-execution instead of faking the pass.
+- **Crash-safe mutation checks** — a dependency-free host helper journals every
+  mutating dispatch and cleanup before execution, atomically settles verified
+  outcomes, and serializes runners with a permanent advisory-lock sidecar on
+  Linux (`flock`) and macOS/FreeBSD (`lockf -k`).
 - **Spec over scoreboard** — WebMCP checkers and inspector extensions grade pages
   against a mix of spec features, conventions, and invented checks. webmcpify
   classifies their findings instead of chasing them: it never emits
@@ -161,7 +165,7 @@ Every phase is a **loop over persistent state**, not a one-shot pass:
 |---|---|
 | [`skills/webmcpify/SKILL.md`](skills/webmcpify/SKILL.md) | The pipeline (what your agent follows) |
 | [`skills/webmcpify/references/`](skills/webmcpify/references/) | Phase guides: inventory, integrate, Workbench, runtime, verify, heal, security, discovery |
-| [`skills/webmcpify/templates/`](skills/webmcpify/templates/) | Vendorable runtime (TS + JS), temporary visual Workbench, ambient types, Playwright verification template, discovery manifest |
+| [`skills/webmcpify/templates/`](skills/webmcpify/templates/) | Vendorable runtime (TS + JS), durable mutation journal, temporary visual Workbench, ambient types, Playwright verification template, discovery manifest |
 
 ## Status
 
