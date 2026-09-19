@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 300" role="img" aria-labelledby="t d">
+  <title id="t">webmcpify — the WebMCP agent skill</title>
+  <desc id="d">Make any web app agent-ready, verifiably: an agent calls typed tools that webmcpify registers in your existing app.</desc>
+  <style>
+    .sans{font-family:'Familjen Grotesk','Segoe UI',system-ui,-apple-system,'Helvetica Neue',Arial,sans-serif} .mono{font-family:'Spline Sans Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace}
+    .ink{fill:#eeedf5} .muted{fill:#a4a2b7} .pink{fill:#c3b6ff}
+    .line{fill:none;stroke:#eeedf5;stroke-width:1.5}
+    .flow{fill:none;stroke:#a492fb;stroke-width:2}
+    .head{fill:#a492fb}
+  </style>
+  <rect x="0.75" y="0.75" width="998.5" height="298.5" rx="16" fill="#12111c" stroke="#2c2a3b" stroke-width="1.5"/>
+  <g transform="translate(40 44)">
+    <rect x="5" y="11" width="54" height="42" rx="10" fill="#1d1930" stroke="#eeedf5" stroke-width="6"/>
+    <circle cx="23" cy="32" r="6" fill="#a492fb"/><circle cx="41" cy="32" r="6" fill="#a492fb"/>
+  </g>
+  <text x="118" y="95" class="sans ink" font-size="50" font-weight="700" letter-spacing="-1">webmcpify</text>
+  <text x="44" y="156" class="sans ink" font-size="25" font-weight="600">Make any web app agent-ready — verifiably.</text>
+  <text x="44" y="190" class="sans muted" font-size="16">The WebMCP agent skill for existing web apps: inventory,</text>
+  <text x="44" y="212" class="sans muted" font-size="16">approve, integrate, then verify every tool in real Chrome.</text>
+  <rect x="44" y="232" width="188" height="28" rx="14" fill="#0d0c15" stroke="#3a3850"/><text x="138" y="250.5" text-anchor="middle" class="mono muted" font-size="12.5">document.modelContext</text><rect x="242" y="232" width="157" height="28" rx="14" fill="#0d0c15" stroke="#3a3850"/><text x="320.5" y="250.5" text-anchor="middle" class="mono muted" font-size="12.5">zero dependencies</text><rect x="409" y="232" width="49" height="28" rx="14" fill="#0d0c15" stroke="#3a3850"/><text x="433.5" y="250.5" text-anchor="middle" class="mono muted" font-size="12.5">MIT</text>
+  <rect x="610" y="40" width="240" height="220" rx="8" fill="#0d0c15" class="line"/>
+  <line x1="610" y1="70" x2="850" y2="70" class="line"/>
+  <circle cx="628" cy="55" r="4" class="line"/><circle cx="642" cy="55" r="4" class="line"/><circle cx="656" cy="55" r="4" class="line"/>
+  <text x="672" y="59" class="mono muted" font-size="12">your-app.example</text>
+  <rect x="628" y="86" width="90" height="10" rx="2" fill="none" stroke="#3c3a4e" stroke-width="1.5"/>
+  <rect x="628" y="110" width="204" height="36" rx="3" fill="none" stroke="#3c3a4e" stroke-width="1.5"/><text x="640" y="133" class="mono pink" font-size="12.5">search_products()</text>
+  <rect x="628" y="156" width="204" height="36" rx="3" fill="none" stroke="#3c3a4e" stroke-width="1.5"/><text x="640" y="179" class="mono pink" font-size="12.5">add_to_cart()</text>
+  <rect x="628" y="202" width="204" height="36" rx="3" fill="none" stroke="#3c3a4e" stroke-width="1.5"/><text x="640" y="225" class="mono pink" font-size="12.5">track_order()</text>
+  <rect x="900" y="118" width="72" height="58" rx="8" fill="#0d0c15" class="line"/>
+  <circle cx="924" cy="140" r="3.5" class="ink"/><circle cx="948" cy="140" r="3.5" class="ink"/>
+  <line x1="921" y1="158" x2="951" y2="158" class="line"/>
+  <text x="936" y="196" text-anchor="middle" class="mono muted" font-size="12">agent</text>
+  <text x="862" y="104" class="mono pink" font-size="12">tool calls</text>
+  <path class="flow" d="M900 133 C875 131 860 129 838 128"/><path class="head" d="M836 128 l9 -4.5 v9 z"/>
+  <path class="flow" d="M900 147 C875 155 860 168 838 174"/><path class="head" d="M836 174 l9 -4.5 v9 z"/>
+  <path class="flow" d="M900 161 C878 180 862 208 838 220"/><path class="head" d="M836 220 l9 -4.5 v9 z"/>
+  <g transform="rotate(-8 826 251)">
+    <rect x="770" y="236" width="112" height="30" rx="4" fill="#12111c" stroke="#a492fb" stroke-width="2"/>
+    <text x="826" y="256" text-anchor="middle" class="mono pink" font-size="13" font-weight="700">VERIFIED ✓</text>
+  </g>
+</svg>
