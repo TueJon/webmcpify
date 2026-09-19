@@ -126,7 +126,7 @@ harness OUTSIDE the repo so the target gains no dependencies:
 
 ```sh
 mkdir -p /tmp/webmcpify-harness && cd /tmp/webmcpify-harness
-npm init -y && npm i -D @playwright/test typescript @types/node
+npm init -y && npm i -D --save-exact @playwright/test@1.61.1 typescript@5.9.3 @types/node@22.20.1
 cat > playwright.config.ts <<'EOF'
 import { defineConfig } from '@playwright/test';
 export default defineConfig({
@@ -138,8 +138,13 @@ EOF
 WEBMCP_SPEC_DIR=<target-repo>/.webmcpify \
 WEBMCP_BASE_URL=<recorded-app.verificationOrigin> \
 WEBMCP_PROFILE_DIR=<dedicated-writable-profile-dir> \
-NODE_PATH=/tmp/webmcpify-harness/node_modules npx playwright test
+NODE_PATH=/tmp/webmcpify-harness/node_modules ./node_modules/.bin/playwright test
 ```
+
+The harness versions are the ones this skill is tested with, and `@playwright/test`
+matches the Workbench's Playwright (`scripts/workbench.mjs`). Bump them together,
+never to `latest`. The local binary is called directly, so a missing install fails
+instead of downloading a package.
 
 `NODE_PATH` lets the out-of-repo spec resolve `@playwright/test`; if the target's
 tooling ignores `NODE_PATH`, symlink instead:
