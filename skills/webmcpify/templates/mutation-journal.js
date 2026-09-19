@@ -57,16 +57,14 @@ function canonicalJson(value) {
   const json = JSON.stringify(value);
   if (json === void 0) throw new Error("mutation arguments must be JSON-serializable");
   const parsed = JSON.parse(json);
-  const sort = (item) => {
-    if (Array.isArray(item)) return item.map(sort);
+  const serialize = (item) => {
+    if (Array.isArray(item)) return `[${item.map(serialize).join(",")}]`;
     if (item && typeof item === "object") {
-      return Object.fromEntries(
-        Object.entries(item).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0).map(([key, nested]) => [key, sort(nested)])
-      );
+      return `{${Object.keys(item).sort((left, right) => left < right ? -1 : left > right ? 1 : 0).map((key) => `${JSON.stringify(key)}:${serialize(item[key])}`).join(",")}}`;
     }
-    return item;
+    return JSON.stringify(item);
   };
-  return JSON.stringify(sort(parsed));
+  return serialize(parsed);
 }
 function fingerprintArguments(value) {
   return `sha256:${createHash("sha256").update(canonicalJson(value)).digest("hex")}`;

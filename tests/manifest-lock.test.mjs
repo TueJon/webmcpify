@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { access, chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -96,6 +97,11 @@ test('argument fingerprints use recursively sorted canonical JSON', () => {
     fingerprintArguments({ 'ä': 1, z: 2, A: 3 }),
     fingerprintArguments({ A: 3, z: 2, 'ä': 1 }),
     'fingerprints must not depend on the host locale',
+  );
+  assert.equal(
+    fingerprintArguments({ 2: 'two', 10: 'ten' }),
+    `sha256:${createHash('sha256').update('{"10":"ten","2":"two"}').digest('hex')}`,
+    'integer-like keys must remain lexicographically sorted in the serialized bytes',
   );
 });
 
