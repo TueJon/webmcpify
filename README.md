@@ -1,3 +1,5 @@
+<h1 align="center">webmcpify — the WebMCP agent skill</h1>
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/readme/banner-dark.svg">

@@ -12,6 +12,8 @@ test('README artwork matches its generator (run node assets/readme/build.mjs)', 
 
 test('README references only existing artwork and both theme variants', () => {
   const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  assert.match(readme, /<h1[^>]*>[^<]*WebMCP agent skill[^<]*<\/h1>/,
+    'README must retain a semantic h1 containing the discoverability phrase');
   for (const base of ['banner', 'pipeline']) {
     assert.match(readme, new RegExp(`assets/readme/${base}-dark\\.svg`));
     assert.match(readme, new RegExp(`assets/readme/${base}-light\\.svg`));
