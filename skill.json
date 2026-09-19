@@ -1,6 +1,6 @@
 {
   "name": "webmcpify",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "WebMCP agent skill for curated core coverage or route-by-route parity — inventory an existing web app, integrate approved tools, then verify and heal them in a real browser.",
   "license": "MIT",
   "author": {
