@@ -6,6 +6,21 @@ reconstruct them from git history.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-09-19
+
+- Tightened eval execution with reviewed versions, bounded runs and approved data;
+  added independent mutation-effect checks and React/Svelte lifecycle acceptance.
+
+- Added input-aware re-verification on resume: retain valid evidence, invalidate
+  affected tools after app/runtime/browser changes, and reconcile uncertain
+  interrupted mutations before retrying. A stable sidecar OS lock now serializes
+  scan-through-settlement across atomic manifest replacement. Status remains read-only.
+
+- Removed automatic unpinned guidance-package execution. Current official guides
+  are read without executing a package; optional CLI use requires an exact reviewed
+  version and user authorization. Scoped verification to dedicated target-app test
+  contexts, with local redacted evidence and explicit untrusted-content boundaries.
+
 ## [0.5.1] — 2026-09-14
 
 - Updated verification for the CG draft and Chrome's 2026-09-11 execution
@@ -71,4 +86,5 @@ reconstruct them from git history.
 [0.4.0]: https://github.com/TueJon/webmcpify/releases/tag/v0.4.0
 [0.5.0]: https://github.com/TueJon/webmcpify/compare/v0.4.0...v0.5.0
 [0.5.1]: https://github.com/TueJon/webmcpify/compare/v0.5.0...v0.5.1
-[Unreleased]: https://github.com/TueJon/webmcpify/compare/v0.5.1...HEAD
+[0.6.0]: https://github.com/TueJon/webmcpify/compare/v0.5.1...v0.6.0
+[Unreleased]: https://github.com/TueJon/webmcpify/compare/v0.6.0...HEAD

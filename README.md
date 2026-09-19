@@ -89,7 +89,19 @@ apps under git, choose whether integration batches are committed). Beyond that i
 only comes back for things it genuinely can't resolve: an app that won't start, or
 a tool that still fails after capped heal attempts. All state persists in
 `.webmcpify/manifest.json`, so runs are **resumable** across sessions, context
-windows, and even different agents.
+windows, and even different agents. On resume, recorded app files, tool contracts,
+runtime and browser inputs determine which verification evidence remains valid.
+Changed or unknown dependencies require fresh checks; uncertain interrupted
+mutations must be reconciled through a read path before retrying. These records
+are skill-managed evidence, not an automatic dependency tracker or a WebMCP field.
+See [re-verification](skills/webmcpify/references/reverify.md).
+
+Verification uses a dedicated test context and approved origins, accounts and
+fixtures. Official guidance is read directly; running an optional guidance package
+requires an exact reviewed version and separate authorization. Mutation checks
+compare the intended effect with an independent read path and an unchanged
+neighbor or invariant. Optional model evals need approved data and explicit
+run, time and spend limits; a smoke pass does not establish journey quality.
 
 ## Built to scale to large codebases
 
@@ -110,7 +122,9 @@ Every phase is a **loop over persistent state**, not a one-shot pass:
   built and typechecked — committed per batch only if you opted in.
 - **Verify/Heal** iterate per tool with attempt caps and honest escalation
   instead of infinite loops; mutating tools get cleanup steps between retries.
-- Interrupt at any point; the next run resumes from the manifest.
+- Interrupt at any point; the next run resumes from the manifest. Verification
+  evidence records app, contract and browser inputs; changed inputs trigger
+  bounded re-verification, while `status` remains read-only.
 
 ## Guarantees
 
@@ -158,9 +172,9 @@ needs `chrome://flags/#enable-webmcp-testing`. The API surface has already chang
 during the trial (testing API removed 2026-07; `navigator` → `document`) — webmcpify
 isolates that churn in one vendored file, and its verification surfaces probe
 whether the browser uses current object input or Chrome 150's legacy JSON-string
-input without retrying real tools. It treats Google's live
-[modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance) as the
-source of current best practices at integration time.
+input without retrying real tools. It reads the official Chrome guides and CG draft directly at integration time.
+The optional modern-web-guidance CLI requires a reviewed exact version and
+separate approval before execution.
 
 Release-by-release spec adaptations are recorded in the [changelog](CHANGELOG.md).
 ChatGPT's separate, model/account-gated client surface is documented as
@@ -172,7 +186,7 @@ and a troubleshooting order.
 - [webmcpify.at](https://webmcpify.at) — project website (itself agent-ready, in all three layers: imperative tools via the vendored runtime, a declarative install form, and a published `/.well-known/webmcp` manifest)
 - [webmachinelearning/webmcp](https://github.com/webmachinelearning/webmcp) — the spec draft (W3C WebML CG)
 - [GoogleChromeLabs/webmcp-tools](https://github.com/GoogleChromeLabs/webmcp-tools) — Google's demos, types, and evals CLI (webmcpify follows these patterns)
-- [GoogleChrome/modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance) — official best-practice guides (webmcpify pulls its WebMCP guides live)
+- [GoogleChrome/modern-web-guidance](https://github.com/GoogleChrome/modern-web-guidance) — official best-practice guides (optional CLI; exact version and execution approval required)
 - [Puppeteer WebMCP](https://pptr.dev/guides/webmcp) — experimental first-class WebMCP automation API (Chrome 151+ as documented 2026-08-29; alternative verify harness)
 - [MCP-B / WebMCP-org](https://github.com/WebMCP-org/npm-packages) — WebMCP ecosystem: polyfill, extension, transports, and dev tooling (webmcpify vendors a minimal runtime instead of adding dependencies)
 

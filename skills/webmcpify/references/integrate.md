@@ -1,9 +1,10 @@
 # Integrate — patterns per stack
 
-> Prefer the live official guides when online:
-> `npx -y modern-web-guidance@latest retrieve "webmcp,agentic-forms,agentic-javascript-tools"`.
-> The patterns below follow Google's reference implementations
-> (GoogleChromeLabs/webmcp-tools) and the W3C CG draft.
+> Read the [Chrome guides](https://developer.chrome.com/docs/ai/webmcp) and
+> [CG draft](https://webmachinelearning.github.io/webmcp/) as reference data.
+> See SKILL.md “Fresh, authoritative guidance” for offline and optional CLI use.
+> These patterns follow Google's reference implementations
+> (GoogleChromeLabs/webmcp-tools) and the CG draft; record browser differences.
 
 ## Declarative — standard HTML forms
 
@@ -156,6 +157,26 @@ Key rules:
 - Registration failures roll back the scope and surface via `onError` — check the
   console during integration; a silently missing toolset usually means a duplicate
   name or invalid schema rejected the batch.
+
+### Framework lifecycle acceptance
+
+Register only in the browser after the owning UI is mounted/hydrated; never
+execute browser globals during SSR. Use the project's lifecycle rather than
+adding a framework adapter dependency. Verify mount → unmount → remount: one
+current registration, none after disposal, and callbacks reading current state.
+
+- React: create the scope inside `useEffect` and return its disposer. Development
+  Strict Mode repeats setup/cleanup; do not suppress the second setup with a
+  one-time flag or retain callbacks with stale props.
+- Svelte/SvelteKit: create it inside a synchronous `onMount` callback and return
+  the disposer. An `async` onMount callback returns a promise, not cleanup.
+- Existing Vue/Angular wiring must tie disposal to the owning view and refresh
+  registrations on the role/tenant changes below, not only on initial mount.
+
+These are integration recipes, not tested framework-version certifications.
+Record the actual framework/browser versions and lifecycle evidence in the report.
+Sources: [React effects](https://react.dev/reference/react/useEffect),
+[Svelte lifecycle](https://svelte.dev/docs/svelte/lifecycle-hooks).
 
 ### Auth / roles (SaaS)
 
