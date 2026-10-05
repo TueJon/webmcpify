@@ -6,6 +6,19 @@ reconstruct them from git history.
 
 ## [Unreleased]
 
+- Preserve the original execution callback options and signal through the TS/JS
+  result guards; retain the existing null/undefined guard and single-flight behavior.
+- Add caller cancellation to the event bridge, including preabort without dispatch,
+  cooperative handler signalling, unknown-outcome errors, and listener/timer cleanup.
+  Registration disposal remains separate; application tools are never retried automatically.
+- Date current-draft/Chrome compatibility guidance, type callback options and
+  ModelContext activation/cancellation events plus the debugging annotation, and
+  distinguish serialized native results from callback values and simulation evidence.
+- Align Workbench imperative simulation with execution cancellation, omitted input
+  and serialized returns; add JS/transpiled-TS regressions. Simulation is not proof
+  of current native Chrome behavior.
+- Correct the README release callout to describe v0.7.0's existing mutation journal.
+
 ## [0.7.0] — 2026-09-19
 
 - Added a dependency-free host-side mutation journal for verification runners.

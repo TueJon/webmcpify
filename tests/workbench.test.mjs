@@ -73,7 +73,7 @@ test('simulated context registers, enumerates, executes and aborts tools', async
   const [tool] = await context.getTools();
   assert.equal(tool.name, 'search_tickets');
   assert.equal(tool.execute, undefined, 'public simulated shape mirrors native RegisteredTool');
-  assert.deepEqual(await context.executeTool(tool, { q: 'bug' }), { count: 3 });
+  assert.equal(await context.executeTool(tool, { q: 'bug' }), '{"count":3}');
   controller.abort();
   assert.equal((await context.getTools()).length, 0);
   assert.deepEqual(events, ['toolchange', 'toolchange']);
@@ -130,4 +130,46 @@ test('stopping before DOM readiness removes the pending simulation context', asy
   assert.equal(await pending.ready, null);
   assert.equal(document.modelContext, undefined);
   assert.equal(listeners.has('DOMContentLoaded'), false);
+});
+
+
+test('simulation separates registration lifetime from active invocation cancellation', async () => {
+  const context = loadApi().createSimulationContext({ dispatchEvent() {} });
+  const registration = new AbortController();
+  const caller = new AbortController();
+  let signal, finish, started;
+  const began = new Promise(resolve => { started = resolve; });
+  await context.registerTool({ name: 'delayed', execute(input, options) {
+    assert.equal(JSON.stringify(input), '{}');
+    signal = options.signal;
+    started();
+    return new Promise(resolve => { finish = resolve; });
+  } }, { signal: registration.signal });
+  const [tool] = await context.getTools();
+  const pending = context.executeTool(tool, undefined, { signal: caller.signal });
+  await began;
+  registration.abort();
+  assert.equal((await context.getTools()).length, 0);
+  assert.equal(signal.aborted, false);
+  const rejected = assert.rejects(pending, error => error === caller.signal.reason);
+  caller.abort();
+  await rejected;
+  assert.equal(signal.aborted, true);
+  finish({ ok: true }); // late completion cannot turn cancellation into success
+});
+
+test('simulation preabort skips execute; default input and serialized strings match current contract', async () => {
+  const context = loadApi().createSimulationContext({ dispatchEvent() {} });
+  let calls = 0;
+  await context.registerTool({ name: 'one', async execute(input, options) {
+    calls++;
+    assert.equal(JSON.stringify(input), '{}');
+    assert.ok(options.signal instanceof AbortSignal);
+    return 'done';
+  } });
+  const [tool] = await context.getTools();
+  const caller = new AbortController(); caller.abort();
+  await assert.rejects(context.executeTool(tool, {}, { signal: caller.signal }), error => error === caller.signal.reason);
+  assert.equal(calls, 0);
+  assert.equal(await context.executeTool(tool), '"done"');
 });

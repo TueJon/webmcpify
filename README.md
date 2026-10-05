@@ -36,10 +36,10 @@ npx skills add TueJon/webmcpify     # once
 ```
 
 > [!TIP]
-> **New in [v0.6.0](https://github.com/TueJon/webmcpify/releases/tag/v0.6.0):**
-> evidence-aware resume — changed app files, contracts or browsers invalidate the
-> verification they affect — plus scoped browser access and independent checks for
-> every mutation.
+> **New in [v0.7.0](https://github.com/TueJon/webmcpify/releases/tag/v0.7.0):**
+> a host-side mutation journal records dispatch and settlement durably, serializes
+> cooperating verification runners with an OS lock, and retains interrupted
+> `started` entries for reconciliation. It does not guarantee exactly-once effects.
 
 ## How it works
 

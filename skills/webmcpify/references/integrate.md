@@ -78,7 +78,7 @@ Use the vendored runtime (`runtime.md`). Tools live in a dedicated module per ap
 (e.g. `src/webmcp/tools.ts`), decoupled from components:
 
 ```ts
-import { createToolScope, dispatchAndWait } from './webmcpify';
+import { createToolScope, dispatchAndWait, singleFlight } from './webmcpify';
 
 export const searchTicketsTool = {
   name: 'search_tickets',
@@ -91,13 +91,19 @@ export const searchTicketsTool = {
     required: ['query'],
   },
   annotations: { readOnlyHint: true, untrustedContentHint: true, consequentialHint: false },
-  async execute(input: Record<string, unknown>) {
+  execute: singleFlight(async (input: Record<string, unknown>, options?: ToolExecuteCallbackOptions) => {
     const q = String(input.query ?? '').trim();
     if (!q) return 'ERROR: `query` must be a non-empty string.';
-    return dispatchAndWait('webmcp:search_tickets', { query: q });
-  },
+    return dispatchAndWait('webmcp:search_tickets', { query: q }, 10000, options?.signal);
+  }),
 };
 ```
+
+Execution options must reach the bridge unchanged through wrappers; use
+`options?.signal` for legacy browsers that omit the second argument. Registration
+abort removes availability; it is separate from execution cancellation. Cancelled
+or timed-out actions have an unknown outcome: inspect state before any manual retry,
+and never automatically retry an application tool. See [dated compatibility](native-compatibility.md).
 
 > **Native I/O compat** — `getTools()` may return `inputSchema` as a string on older Chrome or an object on current implementations — handle both (`typeof === 'string' ? JSON.parse : id`). Current `executeTool` takes an object; Chrome 150 needs `JSON.stringify(args)`, so use the capability-probe adapter from the verification template rather than retrying a real tool. For `validate:true`, register with `inputSchema` only. Runner LLM envelope: `const raw=t.inputSchema; const schema=typeof raw==='string'?JSON.parse(raw):raw??{type:'object',properties:{}}; const llmTool={function:{parameters:schema}}` — never pass `parameters` through WebMCP.
 

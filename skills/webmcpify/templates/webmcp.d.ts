@@ -35,6 +35,8 @@
  */
 
 interface ModelContextToolAnnotations {
+  /** Developer tooling hint; never enforcement. */
+  debugging?: boolean;
   readOnlyHint?: boolean;
   untrustedContentHint?: boolean;
   /** Significant real-world or non-reversible effect; a hint, never enforcement. */
@@ -48,7 +50,34 @@ type ModelContextToolResult =
   | Record<string, unknown>
   | unknown[];
 
+/** Current CG callback options. Legacy Chrome 150 may omit the options argument. */
+interface ToolExecuteCallbackOptions {
+  signal: AbortSignal;
+}
+
+interface ToolActivatedEvent extends Event { readonly toolName: string; }
+interface ToolCancelEvent extends Event { readonly toolName: string; }
+interface ModelContextEventMap {
+  toolchange: Event;
+  toolactivated: ToolActivatedEvent;
+  toolcancel: ToolCancelEvent;
+}
+
 interface ModelContext extends EventTarget {
+  ontoolactivated: ((this: ModelContext, ev: ToolActivatedEvent) => unknown) | null;
+  ontoolcancel: ((this: ModelContext, ev: ToolCancelEvent) => unknown) | null;
+  addEventListener<K extends keyof ModelContextEventMap>(
+    type: K, listener: (this: ModelContext, ev: ModelContextEventMap[K]) => unknown,
+    options?: boolean | AddEventListenerOptions,
+  ): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject | null,
+    options?: boolean | AddEventListenerOptions): void;
+  removeEventListener<K extends keyof ModelContextEventMap>(
+    type: K, listener: (this: ModelContext, ev: ModelContextEventMap[K]) => unknown,
+    options?: boolean | EventListenerOptions,
+  ): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject | null,
+    options?: boolean | EventListenerOptions): void;
   registerTool(
     tool: ModelContextTool,
     options?: { signal?: AbortSignal; exposedTo?: string[] },
@@ -61,13 +90,15 @@ interface ModelContext extends EventTarget {
   getTools(options?: { fromOrigins?: string[] }): Promise<RegisteredTool[]>;
   /**
    * Agent/test execution surface in the CG draft. Current Chrome accepts an
-   * object; Chrome 150's JSON-string input remains in the verification adapter.
+   * object and returns its serialized result; navigation null is retained for
+   * Chrome/declarative compatibility even though the 2026-10-02 draft IDL lists
+   * DOMString. Chrome 150's JSON-string input remains in the verification adapter.
    */
   executeTool?(
     tool: RegisteredTool,
     inputObject?: unknown,
     options?: { signal?: AbortSignal },
-  ): Promise<ModelContextToolResult | null>;
+  ): Promise<string | null>;
   /** Internal simulation capability used by the vendored Workbench. */
   __webmcpStubObjectMode?: boolean;
 }
@@ -82,13 +113,12 @@ interface ModelContextTool {
   /** JSON Schema for the tool's input */
   inputSchema?: object;
   /**
-   * Only `input` is passed — there is no client/session argument in the IDL.
-   * IDL: `Promise<any>` — WebIDL auto-wraps synchronous returns (and throws) in
-   * a promise, so a sync implementation still fulfills this type at runtime;
-   * declare it async for type fidelity.
+   * Current draft passes options with a required signal; second argument is optional
+   * here to represent legacy Chrome 150. Forward options unchanged; registration
+   * signals only control availability. Return JSON-safe results, never bare absence.
+   * Native executeTool serializes this callback result (checked 2026-10-05).
    */
-  /** JSON-safe result; bare null/undefined are intentionally excluded. */
-  execute(input: Record<string, unknown>): Promise<ModelContextToolResult>;
+  execute(input: Record<string, unknown>, options?: ToolExecuteCallbackOptions): Promise<ModelContextToolResult>;
   annotations?: ModelContextToolAnnotations;
 }
 
