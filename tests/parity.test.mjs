@@ -349,3 +349,115 @@ test('singleFlight: custom busy message is used', async () => {
   assert.deepEqual(results[0], results[1]);
   assert.equal(results[0], 'ERROR: custom busy');
 });
+
+for (const [tag, mod] of variants) {
+  test(`${tag}: result guard preserves input/options identity, singleFlight varargs and absent-result guard`, async () => {
+    freshWindow();
+    let registered;
+    setModelContext({ registerTool: async tool => { registered = tool; } });
+    const input = { q: 'identity' };
+    const options = { signal: new AbortController().signal };
+    let finish, calls = 0;
+    const scope = mod.createToolScope(`options-${tag}`, [{
+      name: 'identity', description: 'Tests forwarding.',
+      execute: mod.singleFlight(async (actualInput, actualOptions) => {
+        calls++;
+        assert.equal(actualInput, input);
+        assert.equal(actualOptions, options);
+        assert.equal(actualOptions.signal, options.signal);
+        return new Promise(resolve => { finish = resolve; });
+      }),
+    }], { validate: false });
+    assert.equal(await scope.ready, true);
+    const pending = registered.execute(input, options);
+    assert.equal(await registered.execute(input, options), BUSY);
+    assert.equal(calls, 1);
+    finish('done');
+    assert.equal(await pending, 'done');
+    scope();
+    for (const value of [null, undefined, false, 0, '', { ok: true }]) {
+      const handle = mod.createToolScope(`guard-${tag}`, [{
+        name: 'guard', description: 'Tests guard.', async execute(_, actualOptions) {
+          assert.equal(actualOptions, options); return value;
+        },
+      }], { validate: false });
+      await handle.ready;
+      const result = await registered.execute(input, options);
+      if (value == null) { assert.equal(result.ok, false); assert.match(result.error, /returned (null|undefined)/); }
+      else assert.equal(result, value);
+      handle();
+    }
+  });
+
+  test(`${tag}: cooperative bridge cancellation prevents delayed commit; disposal only removes availability`, async () => {
+    const win = freshWindow();
+    let registered, registrationSignal, signal, commits = 0;
+    setModelContext({ async registerTool(tool, options) {
+      registered = tool; registrationSignal = options.signal;
+    } });
+    win.addEventListener('parity:save', event => {
+      signal = event.detail.signal;
+      const timer = setTimeout(() => {
+        if (!signal.aborted) {
+          commits++;
+          win.dispatchEvent(new CustomEvent(`tool-completion-${event.detail.requestId}`, { detail: { ok: true } }));
+        }
+      }, 20);
+      signal.addEventListener('abort', () => clearTimeout(timer), { once: true });
+    });
+    const handle = mod.createToolScope(`cancel-${tag}`, [{
+      name: 'save', description: 'Synthetic save.',
+      execute: mod.singleFlight((input, options) => mod.dispatchAndWait('parity:save', input, 1000, options?.signal)),
+    }], { validate: false });
+    await handle.ready;
+    const caller = new AbortController();
+    const pending = registered.execute({}, { signal: caller.signal });
+    handle();
+    assert.equal(registrationSignal.aborted, true);
+    assert.equal(signal.aborted, false, 'scope disposal does not abort the active execution');
+    caller.abort('user cancelled');
+    assert.match(await pending, /cancelled.*outcome is unknown/);
+    assert.equal(signal.aborted, true);
+    assert.equal(signal.reason, 'user cancelled');
+    await new Promise(resolve => setTimeout(resolve, 30));
+    assert.equal(commits, 0);
+  });
+
+  test(`${tag}: bridge preabort avoids dispatch and cleans timers/listeners on every settlement`, async () => {
+    for (const outcome of ['preabort', 'cancel', 'success', 'failure', 'malformed', 'timeout', 'dispatch-error']) {
+      const win = freshWindow();
+      const caller = new AbortController();
+      let dispatches = 0, timers = 0;
+      const completionListeners = new Set(), callerListeners = new Set();
+      const add = win.addEventListener.bind(win), remove = win.removeEventListener.bind(win);
+      win.addEventListener = (name, ...args) => { if (name.startsWith('tool-completion-')) completionListeners.add(args[0]); return add(name, ...args); };
+      win.removeEventListener = (name, ...args) => { if (name.startsWith('tool-completion-')) completionListeners.delete(args[0]); return remove(name, ...args); };
+      const callerAdd = caller.signal.addEventListener.bind(caller.signal), callerRemove = caller.signal.removeEventListener.bind(caller.signal);
+      caller.signal.addEventListener = (...args) => { callerListeners.add(args[1]); return callerAdd(...args); };
+      caller.signal.removeEventListener = (...args) => { callerListeners.delete(args[1]); return callerRemove(...args); };
+      let handlerSignal;
+      add('parity:cleanup', event => {
+        dispatches++; handlerSignal = event.detail.signal;
+        if (outcome === 'cancel') caller.abort();
+        if (['success', 'failure', 'malformed'].includes(outcome)) win.dispatchEvent(new CustomEvent(`tool-completion-${event.detail.requestId}`, {
+          detail: outcome === 'malformed' ? {} : { ok: outcome === 'success' },
+        }));
+      });
+      if (outcome === 'preabort') caller.abort();
+      if (outcome === 'dispatch-error') win.dispatchEvent = () => { throw new Error('dispatch failed'); };
+      const originalSet = globalThis.setTimeout, originalClear = globalThis.clearTimeout;
+      const active = new Set();
+      globalThis.setTimeout = (fn, delay) => { const id = originalSet(fn, delay); active.add(id); timers++; return id; };
+      globalThis.clearTimeout = id => { if (active.delete(id)) timers--; originalClear(id); };
+      try {
+        const result = await mod.dispatchAndWait('parity:cleanup', {}, 5, caller.signal);
+        assert.equal(timers, 0, outcome);
+        assert.equal(completionListeners.size, 0, outcome);
+        assert.equal(callerListeners.size, 0, outcome);
+        assert.equal(dispatches, ['preabort', 'dispatch-error'].includes(outcome) ? 0 : 1);
+        if (outcome === 'success') { assert.equal(result, 'Action completed successfully.'); caller.abort(); assert.equal(handlerSignal.aborted, false); }
+        else assert.match(result, /^ERROR:/);
+      } finally { globalThis.setTimeout = originalSet; globalThis.clearTimeout = originalClear; }
+    }
+  });
+}

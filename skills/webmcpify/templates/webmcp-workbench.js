@@ -65,6 +65,7 @@
           throw new TypeError('Simulated WebMCP tools need a name and execute function.');
         }
         if (tools.has(tool.name)) throw new Error(`Tool "${tool.name}" is already registered.`);
+        if (options.signal?.aborted) throw options.signal.reason;
         tools.set(tool.name, { public: { ...tool, execute: undefined }, execute: tool.execute });
         options.signal?.addEventListener('abort', () => {
           if (tools.delete(tool.name)) notify();
@@ -74,11 +75,42 @@
       async getTools() {
         return Array.from(tools.values(), ({ public: tool }) => ({ ...tool }));
       },
-      async executeTool(tool, input) {
+      // Simulation of current imperative cancellation, not native browser evidence.
+      async executeTool(tool, input = {}, options = {}) {
+        if (options.signal?.aborted) throw options.signal.reason;
         const registered = tools.get(tool?.name);
         if (!registered) throw new Error(`Tool "${tool?.name ?? 'unknown'}" is not registered.`);
         const args = typeof input === 'string' ? JSON.parse(input) : input;
-        return registered.execute(args ?? {});
+        const execution = new AbortController();
+        return new Promise((resolve, reject) => {
+          let settled = false;
+          const cleanup = () => options.signal?.removeEventListener('abort', onAbort);
+          const onAbort = () => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            execution.abort(options.signal.reason);
+            reject(options.signal.reason);
+          };
+          options.signal?.addEventListener('abort', onAbort, { once: true });
+          Promise.resolve().then(() => {
+            if (settled) return;
+            return registered.execute(args ?? {}, { signal: execution.signal });
+          }).then((result) => {
+            if (settled) return;
+            // Native executeTool returns the JSON serialization, including strings.
+            const serialized = JSON.stringify(result);
+            if (serialized === undefined) throw new TypeError('Tool result is not JSON serializable.');
+            settled = true;
+            cleanup();
+            resolve(serialized);
+          }).catch((error) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            reject(error);
+          });
+        });
       },
     };
     return context;
