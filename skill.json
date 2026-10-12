@@ -1,6 +1,6 @@
 {
   "name": "webmcpify",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "WebMCP agent skill for curated core coverage or route-by-route parity — inventory an existing web app, integrate approved tools, then verify and heal them in a real browser.",
   "license": "MIT",
   "author": {
@@ -23,7 +23,7 @@
     {
       "id": "webmcpify",
       "path": "skills/webmcpify/SKILL.md",
-      "description": "Choose curated core coverage or route-by-route parity, inventory an existing web app, integrate approved WebMCP tools, then verify and heal them in a real browser."
+      "description": "WebMCP agent skill — choose curated core coverage or route-by-route parity, inventory an existing web app, integrate approved WebMCP tools, then verify and heal them in a real browser."
     }
   ],
   "agents": ["claude-code", "codex", "cursor", "opencode", "copilot", "gemini-cli"],

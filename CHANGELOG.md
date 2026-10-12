@@ -6,6 +6,8 @@ reconstruct them from git history.
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-10-12
+
 - Preserve the original execution callback options and signal through the TS/JS
   result guards; retain the existing null/undefined guard and single-flight behavior.
 - Add caller cancellation to the event bridge, including preabort without dispatch,
@@ -18,6 +20,10 @@ reconstruct them from git history.
   and serialized returns; add JS/transpiled-TS regressions. Simulation is not proof
   of current native Chrome behavior.
 - Correct the README release callout to describe v0.7.0's existing mutation journal.
+
+- Refresh dated source boundaries: imperative API remains a CG draft, declarative
+  forms are Chrome experimental implementation / separate exploration after upstream
+  PR #338, and current Site tools model/workspace guidance is dated 2026-10-12.
 
 ## [0.7.0] — 2026-09-19
 
@@ -125,4 +131,5 @@ reconstruct them from git history.
 [0.6.0]: https://github.com/TueJon/webmcpify/compare/v0.5.1...v0.6.0
 [0.6.1]: https://github.com/TueJon/webmcpify/compare/v0.6.0...v0.6.1
 [0.7.0]: https://github.com/TueJon/webmcpify/compare/v0.6.1...v0.7.0
-[Unreleased]: https://github.com/TueJon/webmcpify/compare/v0.7.0...HEAD
+[0.7.1]: https://github.com/TueJon/webmcpify/compare/v0.7.0...v0.7.1
+[Unreleased]: https://github.com/TueJon/webmcpify/compare/v0.7.1...HEAD

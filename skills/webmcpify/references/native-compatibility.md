@@ -1,4 +1,4 @@
-# Native compatibility — checked 2026-10-05
+# Native compatibility — documentation checked 2026-10-12
 
 WebMCP is evolving. These are separate evidence levels; simulation results are
 not native browser acceptance.
@@ -25,6 +25,11 @@ The [Chrome declarative guide](https://developer.chrome.com/docs/ai/webmcp/decla
 `preventDefault()`. Activation/cancellation events target `document.modelContext`;
 window event handlers are unsupported from Chrome 156. Declarative submission and
 navigation are not covered by imperative simulation.
+
+As checked 2026-10-12, the CG draft covers the imperative API. [Upstream PR #338](https://github.com/webmachinelearning/webmcp/pull/338),
+merged 2026-10-08, removed its declarative section; declarative forms remain an
+experimental Chrome implementation with the guide above and a separate explainer.
+This documentation update does not extend the dated native evidence below.
 
 ## Accepted native evidence: Chrome 150
 
