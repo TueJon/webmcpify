@@ -6,17 +6,22 @@ discovery conventions has grown around the spec. This layer is **optional,
 non-normative, and public** — treat it as a separate deliverable, never as part
 of a default integration.
 
-## What is standardized and what is not
+## Draft, experimental implementation and conventions — checked 2026-10-12
 
 | Surface | Status | Source |
 |---|---|---|
-| `document.modelContext` (imperative) | **Spec** (W3C WebML CG draft, Chrome origin trial) | [webmcp explainer](https://webmachinelearning.github.io/webmcp/) |
+| `document.modelContext` (imperative) | **CG draft**, not a finalized standard (Chrome origin trial) | [webmcp explainer](https://webmachinelearning.github.io/webmcp/) |
 | `navigator.modelContext` | **Deprecated** compatibility surface from the Chrome 149 trial — probe it as a fallback, never target it | same |
-| `toolname`, `tooldescription`, `toolautosubmit` on the `<form>`; `toolparamdescription` on the form **control** (or enclosing `<fieldset>`) | **Spec** (declarative API explainer, Chrome docs) | [declarative-api-explainer](https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md) |
-| `toolactivated` / `toolcancel` events, `:tool-form-active` / `:tool-submit-active` | **Spec** | Chrome declarative API docs |
+| `toolname`, `tooldescription`, `toolautosubmit` on the `<form>`; `toolparamdescription` on the form **control** (or enclosing `<fieldset>`) | **Chrome experimental implementation / separate explainer** | [declarative-api-explainer](https://github.com/webmachinelearning/webmcp/blob/main/declarative-api-explainer.md) |
+| `toolactivated` / `toolcancel` events, `:tool-form-active` / `:tool-submit-active` | **Chrome experimental implementation / separate explainer** | [Chrome declarative guide](https://developer.chrome.com/docs/ai/webmcp/declarative-api) |
 | `/.well-known/webmcp` manifest | **Not specified.** Chrome discussed pre-visit discovery; nothing shipped. De-facto convention pushed by third-party checkers/registries | community |
 | `<link rel="webmcp">`, `Link: </.well-known/webmcp>; rel="webmcp"` | **Not specified** (RFC 8288 is, the `webmcp` relation is not registered) | community |
 | `llms.txt`, `AGENTS.md`, robots.txt AI-bot rules | Conventions, widely read | community |
+
+The CG draft focuses on the imperative API: [upstream PR #338](https://github.com/webmachinelearning/webmcp/pull/338),
+merged 2026-10-08, removed the declarative section. Declarative forms remain an
+experimental Chrome implementation described by its [official guide](https://developer.chrome.com/docs/ai/webmcp/declarative-api)
+and the separate explainer; do not call them part of the current CG draft.
 
 Never invent attributes to satisfy a checker (see *Third-party audits* below).
 

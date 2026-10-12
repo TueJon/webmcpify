@@ -1,6 +1,6 @@
 # ChatGPT client reality — Site tools
 
-Checked 2026-09-14 against the official OpenAI documentation:
+Checked 2026-10-12 against the official OpenAI documentation:
 <https://learn.chatgpt.com/docs/webmcp>. Re-check that page before publishing or
 relying on model/workspace availability; this UI is moving independently of the
 WebMCP draft and Chrome implementation.
@@ -11,11 +11,10 @@ WebMCP draft and Chrome implementation.
   browser, open **Site tools** in the address bar and then **Available site tools**
   to inspect the page's registrations. This is the fastest client-side ground
   truth for the currently open page.
-- Site tools are available to ChatGPT Work and Codex with GPT-5.6 Sol or GPT-5.6
-  Terra. GPT-5.6 Luna currently has WebMCP disabled. The desktop app must be
+- Site tools are available to ChatGPT Work and Codex with GPT-5.6 Sol or GPT-6 Sol. GPT-5.6 Luna currently has WebMCP disabled. The desktop app must be
   current, and availability still depends on rollout and the current page.
-- The official page says Site tools are unavailable in Enterprise and Edu
-  workspaces.
+- Enterprise requires an administrator to allow Site tools through workspace
+  policy. Site tools remain unavailable in Edu; rollout and page availability vary.
 - ChatGPT's built-in browser currently implements only a subset of WebMCP: it
   discovers imperative tools registered with JavaScript in the top-level page,
   not declarative form tools or tools registered inside iframes. This is a

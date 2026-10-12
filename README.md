@@ -36,10 +36,11 @@ npx skills add TueJon/webmcpify     # once
 ```
 
 > [!TIP]
-> **New in [v0.7.0](https://github.com/TueJon/webmcpify/releases/tag/v0.7.0):**
-> a host-side mutation journal records dispatch and settlement durably, serializes
-> cooperating verification runners with an OS lock, and retains interrupted
-> `started` entries for reconciliation. It does not guarantee exactly-once effects.
+> **New in [v0.7.1](https://github.com/TueJon/webmcpify/releases/tag/v0.7.1):**
+> execution options and cancellation signals reach your handlers unchanged. The
+> event bridge supports cooperative cancellation; an aborted call can still have
+> unknown effects, so inspect state before retrying. See the
+> [dated native compatibility evidence](skills/webmcpify/references/native-compatibility.md).
 
 ## How it works
 
