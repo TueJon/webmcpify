@@ -163,6 +163,21 @@ Puppeteer. As documented on 2026-08-29, that `page.webmcp` surface requires
 Chrome 151+ and `--enable-features=WebMCP`; keep this requirement separate from
 the page-context Playwright harness above, which was measured against Chrome 150.
 
+**Optional native Playwright API:** an existing Playwright 1.64+ setup may use
+[`page.webmcp` / `frame.webmcp`](https://playwright.dev/docs/api/class-webmcp)
+after capability detection and a pinned browser check. Local proof on 2026-11-02
+used Playwright 1.64.1 with headed Chrome 156.0.8078.47:
+`tools()` enumerated tools and `callTool()` returned structured results.
+**A fulfilled call is not a pass:** `callTool()` returns `isError: true` results
+without throwing, so inspect that flag and the application result explicitly.
+Keep the in-page adapter when checking metadata not exposed by this alternative,
+including annotations and complete `RegisteredTool` origin/window identity;
+a name/count check cannot replace those assertions. Keep the host journal around
+every mutation, invalid example and cleanup, and reconcile interrupted attempts
+before replay. Do not upgrade the target's toolchain or install another browser
+merely to use this alternative; the pinned standalone-harness default above stays
+unchanged.
+
 ## Mutation dispatch prerequisite
 
 Before using the spec template, Puppeteer, Workbench, smoke or model runners,

@@ -12,6 +12,15 @@ Applies to plain HTML, SSG-emitted, server-rendered, and framework-rendered
 (uncontrolled) forms — anywhere a real `<form>` with named controls exists.
 Annotate the existing form; do not restructure it.
 
+**Check existing framework exposure first.** Angular Signal Forms can already
+register an imperative tool through `provideExperimentalWebMcpForms` and
+`experimentalWebMcpTool`. Inventory that registration and its actual submit
+behavior before adding markup. Never add declarative `toolname` attributes or a
+second imperative owner for the same form/action. An implicit Signal Form tool
+can populate the model and invoke submission directly: classify and approve it
+as a mutation before invoking it. Do not enable framework providers or install
+adapter dependencies automatically. See [Angular WebMCP](https://angular.dev/ai/webmcp).
+
 ```html
 <form toolname="request_quote"
       tooldescription="Requests a project quote. A team member replies within one business day."
@@ -178,6 +187,32 @@ current registration, none after disposal, and callbacks reading current state.
   the disposer. An `async` onMount callback returns a promise, not cleanup.
 - Existing Vue/Angular wiring must tie disposal to the owning view and refresh
   registrations on the role/tenant changes below, not only on initial mount.
+
+For an app that already uses a framework adapter, inventory its existing owner
+and exact version before making changes. Do not duplicate or automatically
+replace its registrations. Check native registration completion, current
+callback state, execution-options forwarding, explicit failure results and
+disposal separately; an adapter's own registered flag is not native evidence.
+
+Versioned local observations (2026-11-02, headed Chrome 156.0.8078.47):
+
+- React `use-webmcp-tool@0.3.0` and VueUse `useWebMCP` 15.0.0 turn absent
+  results into empty success (`{content:[]}`) and can report registered before
+  asynchronous registration settles. VueUse 15.0.0 also drops callback execution
+  options, including the caller signal.
+- Angular 22.2.4 executes within the owning injector and joins its destruction
+  signal with caller cancellation. Injector disposal therefore differs from the
+  vendored runtime's registration-only disposal. For route providers, inspect
+  `withAutoCleanupInjectors` and verify the injector actually dies on navigation;
+  direct injector destruction, not router navigation, was tested locally.
+
+Preserve explicit structured results, application confirmation and the host
+mutation journal regardless of owner. A missing safeguard blocks verification;
+do not infer compatibility from lifecycle success. Keep the dependency-free
+default for new registrations. Upstream sources:
+[React hook](https://github.com/GoogleChromeLabs/use-webmcp-tool),
+[VueUse](https://vueuse.org/core/usewebmcp/),
+[Angular](https://angular.dev/ai/webmcp).
 
 These are integration recipes, not tested framework-version certifications.
 Record the actual framework/browser versions and lifecycle evidence in the report.
