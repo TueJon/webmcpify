@@ -42,13 +42,24 @@ Contract facts that generated assertions MUST respect:
 - Enumerated `inputSchema` may be stringified (older Chrome) or object (current
   implementations/spec stubs) — `typeof === "string" ? JSON.parse(s) : s ??
   {type:'object',properties:{}}` before comparing.
+- When the approved contract declares optional `outputSchema`, normalize its
+  string/object representation without turning omission into an empty schema.
+  Compare it when exposed; a difference is contract drift. If the browser omits
+  it (observed Chrome 156.0.8078.47, 2026-11-09), record unsupported native
+  metadata propagation and prove registration in app/unit tests instead. Never
+  claim native propagation from an absent field. A declared schema is not
+  automatic output validation: still inspect result/error and UI evidence.
 - The CG draft and Chrome docs define `consequentialHint`, but Chrome 150 accepted
   it at registration and omitted it from `getTools()`. Assert the expected value
   when the enumerated property exists; otherwise record a dated browser-compatibility
   annotation and prove the registration object in an app/unit test. Never claim
   native propagation from an absent field.
-- `executeTool(...)` resolves to a **JSON string result, or `null` when the execution
-  navigated** — stub may return object; normalize via `typeof` before `toMatch`.
+- Preserve the raw `executeTool(...)` result. Object callbacks can arrive as JSON
+  text while scalar behavior differs: Chrome 156.0.8078.47 returned strings
+  unquoted, undefined as string `undefined` and BigInt as decimal text on
+  2026-11-09. Draft-shaped simulation differs; see [dated compatibility](native-compatibility.md).
+  A browser-owned navigation `null` and a stub object remain distinct. Normalize
+  by observed type; never retry an application tool to discover representation.
 - The current CG draft and Chrome documentation use a JavaScript object for
   `executeTool` input. Chrome 150 still requires a JSON string, including for
   tools with omitted `inputSchema`, and Chrome documents string input as
