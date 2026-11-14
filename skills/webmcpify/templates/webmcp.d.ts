@@ -90,7 +90,8 @@ interface ModelContext extends EventTarget {
   getTools(options?: { fromOrigins?: string[] }): Promise<RegisteredTool[]>;
   /**
    * Agent/test execution surface in the CG draft. Current Chrome accepts an
-   * object and returns its serialized result; navigation null is retained for
+   * object; scalar result serialization can differ from the draft (see dated
+   * native compatibility evidence). Navigation null is retained for
    * Chrome/declarative compatibility even though the 2026-10-02 draft IDL lists
    * DOMString. Chrome 150's JSON-string input remains in the verification adapter.
    */
@@ -112,11 +113,14 @@ interface ModelContextTool {
   description: string;
   /** JSON Schema for the tool's input */
   inputSchema?: object;
+  /** Optional expected output contract in the current CG draft; not runtime authorization/validation. */
+  outputSchema?: object;
   /**
    * Current draft passes options with a required signal; second argument is optional
    * here to represent legacy Chrome 150. Forward options unchanged; registration
    * signals only control availability. Return JSON-safe results, never bare absence.
-   * Native executeTool serializes this callback result (checked 2026-10-05).
+   * Native result representation is browser/version-dependent; preserve raw
+   * results rather than assuming every scalar is JSON text (checked 2026-11-09).
    */
   execute(input: Record<string, unknown>, options?: ToolExecuteCallbackOptions): Promise<ModelContextToolResult>;
   annotations?: ModelContextToolAnnotations;
@@ -128,6 +132,8 @@ interface RegisteredTool {
   title?: string;
   description: string;
   inputSchema?: string | object;
+  /** Current draft metadata; older browsers may omit it even when provided at registration. */
+  outputSchema?: string | object;
   annotations?: ModelContextToolAnnotations;
   /** Registering origin (secure origins only). */
   origin: string;

@@ -112,6 +112,54 @@ test('simulated context rejects duplicate and malformed registrations', async ()
   await assert.rejects(() => context.registerTool({ name: 'one', execute() {} }), /already registered/);
 });
 
+test('simulation snapshots input/output schemas at registration and each enumeration', async () => {
+  const context = loadApi().createSimulationContext({ dispatchEvent() {} });
+  const inputSchema = { type: 'object', properties: { q: { type: 'string' } } };
+  const outputSchema = { type: 'object', properties: { value: { type: 'string' } } };
+  await context.registerTool({ name: 'read_schema', description: 'Reads fixture data.', inputSchema, outputSchema, execute: async () => ({ value: 'ok' }) });
+  inputSchema.properties.q.type = 'number';
+  outputSchema.properties.value.type = 'number';
+  const [first] = await context.getTools();
+  assert.equal(first.inputSchema.properties.q.type, 'string');
+  assert.equal(first.outputSchema.properties.value.type, 'string');
+  first.inputSchema.properties.q.type = 'boolean';
+  first.outputSchema.properties.value.type = 'boolean';
+  const [second] = await context.getTools();
+  assert.equal(second.inputSchema.properties.q.type, 'string');
+  assert.equal(second.outputSchema.properties.value.type, 'string');
+  assert.equal(await context.executeTool(second, {}), '{"value":"ok"}');
+});
+
+test('schema serialization fails before registration and leaves the name reusable', async () => {
+  for (const field of ['inputSchema', 'outputSchema']) {
+    for (const makeInvalid of [
+      () => { const schema = {}; schema.self = schema; return schema; },
+      () => ({ value: 1n }),
+      () => ({ toJSON() { return undefined; } }),
+      () => 'not an object',
+      () => null,
+    ]) {
+      const events = [];
+      const context = loadApi().createSimulationContext({ dispatchEvent(event) { events.push(event.type); } });
+      await assert.rejects(context.registerTool({ name: 'read_schema', [field]: makeInvalid(), execute: async () => ({ ok: true }) }), { name: 'TypeError' });
+      assert.equal((await context.getTools()).length, 0);
+      assert.equal(events.length, 0);
+      await context.registerTool({ name: 'read_schema', execute: async () => ({ ok: true }) });
+      assert.equal((await context.getTools()).length, 1);
+    }
+  }
+});
+
+test('schema snapshots use JSON serialization, permit omission and preserve metadata', async () => {
+  const context = loadApi().createSimulationContext({ dispatchEvent() {} });
+  await context.registerTool({ name: 'read_custom', outputSchema: { toJSON() { return { type: 'string' }; } }, execute: async () => 'value' });
+  await context.registerTool({ name: 'read_omitted', inputSchema: undefined, outputSchema: undefined, execute: async () => 'value' });
+  const [custom, omitted] = await context.getTools();
+  assert.equal(JSON.stringify(custom.outputSchema), '{"type":"string"}');
+  assert.equal(omitted.inputSchema, undefined);
+  assert.equal(omitted.outputSchema, undefined);
+});
+
 test('stopping before DOM readiness removes the pending simulation context', async () => {
   const listeners = new Map();
   const document = {

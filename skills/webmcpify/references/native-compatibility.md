@@ -1,4 +1,4 @@
-# Native compatibility — documentation checked 2026-10-12
+# Native compatibility — documentation checked 2026-11-09
 
 WebMCP is evolving. These are separate evidence levels; simulation results are
 not native browser acceptance.
@@ -7,10 +7,12 @@ not native browser acceptance.
 
 The [CG draft](https://webmachinelearning.github.io/webmcp/) specifies callback
 options containing an execution signal, optional input defaulting to `{}`, and
-JSON serialization of successful imperative results. A callback returning `"done"`
-therefore produces the JSON string text `"done"` at `executeTool`, including the
-quotes; a callback object produces serialized JSON. Callback values and native
-client results are different boundaries. Browser-owned `null` for declarative
+JSON serialization of successful imperative results. Under that draft algorithm,
+a callback returning `"done"` produces JSON-quoted text; native Chrome scalar
+behavior can differ (see the Nov9 observations below and open
+[issue #361](https://github.com/webmachinelearning/webmcp/issues/361)). Callback
+values, draft expectations and native results are separate boundaries.
+Browser-owned `null` for declarative
 navigation is separate from the runtime guard against absent imperative results.
 
 The [Chrome imperative guide](https://developer.chrome.com/docs/ai/webmcp/imperative-api)
@@ -63,11 +65,45 @@ WebMCPTesting, temporary synthetic loopback fixture only. All five probes pass:
 | Registration abort during execution | Tool disappeared; already-started callback completed, side effect ran, and caller fulfilled. |
 | Omitted execute input | Callback invoked once with `{}`. |
 
-Successful imperative results arrived as serialized JSON strings: the callback
+Successful object-callback results arrived as serialized JSON strings: the callback
 object `{ accepted: true }` produced the string `{"accepted":true}`. `unregisterTool`
 was absent; removal was tested only through the registration AbortSignal, not a
 distinct unregister operation. These five probes do not establish native WPT,
 declarative submission/navigation, or debugging-annotation conformance.
+
+## Read-only native observations: Chrome 156 stable, 2026-11-09
+
+Headed Chrome 156.0.8078.47 with WebMCP/WebMCPTesting and Playwright 1.61.1,
+fresh dedicated context, ephemeral loopback fixture and read-only synthetic tools:
+
+| Callback value | Native result | Draft-shaped Workbench simulation |
+|---|---|---|
+| string `hi` | unquoted string `hi` | JSON-quoted text |
+| object `{a:1}` | JSON text | JSON text |
+| number / boolean / null | strings `3` / `true` / `null` | same |
+| undefined / function | string `undefined` | rejection |
+| BigInt `1n` | string `1` | rejection |
+| nested BigInt / thrown error | UnknownError rejection | TypeError / Error rejection |
+
+Input schemas were isolated from source/enumeration mutation, and four invalid
+input schemas rejected. `outputSchema` was absent from enumeration; four invalid
+output schemas were ignored by this installed browser. Native output-metadata
+propagation/deep-copy conformance is therefore unsupported, not verified. The
+[Nov2 draft addition](https://github.com/webmachinelearning/webmcp/pull/254)
+defines optional outputSchema and schema JSON snapshot semantics; it does not
+guarantee automatic output validation or application authorization.
+
+Three target-document calls (registration, enumeration, execution) on a
+same-origin iframe denied `tools` rejected with NotAllowedError. The initial
+about:blank replacement evaluation timed out after 12 seconds; no document-
+lifetime pass is claimed. Experimental `waitForToolsUntil` was not invoked.
+These custom observations are not WPT conformance or Chrome158 acceptance.
+
+The corrected simulation JSON-snapshots both schemas at registration, rejects
+serialization failures and returns fresh schema copies at enumeration. It models
+draft metadata/serialization semantics, not every installed browser. Preserve raw
+native results and absent-result guards; a mismatch is not permission to retry
+application mutations or discard unknown-outcome journal entries.
 
 ## Local runtime and verification boundaries
 

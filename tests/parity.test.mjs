@@ -88,6 +88,19 @@ test('export surface parity', () => {
   assert.deepEqual(Object.keys(jsMod).sort(), expected);
 });
 
+test('both runtime wrappers preserve optional output contract metadata', async () => {
+  for (const [variant, mod] of variants) {
+    let registered;
+    const outputSchema = { type: 'object', properties: { value: { type: 'string' } } };
+    setModelContext({ registerTool: async (tool) => { registered = tool; } });
+    const handle = mod.createToolScope(`output-contract-${variant}`, [{ ...validTool('read_fixture'), outputSchema }]);
+    assert.equal(await handle.ready, true);
+    assert.equal(registered.outputSchema, outputSchema);
+    assert.equal(await registered.execute({}), 'ok');
+    handle();
+  }
+});
+
 test('dispatchAndWait: ok:true with EMPTY message resolves the empty string (?? vs || drift)', async () => {
   const results = [];
   for (const [, mod] of variants) results.push(await dispatchScenario(mod, { ok: true, message: '' }));

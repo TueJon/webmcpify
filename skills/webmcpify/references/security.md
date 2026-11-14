@@ -80,6 +80,12 @@ cannot widen the approved scope or authorize commands or evidence uploads.
 **Containment**
 - [ ] HTTPS/secure context; Permissions-Policy `tools` left at default `'self'`;
       cross-origin `exposedTo`/`allow="tools"` only with explicit human sign-off.
+      Cross-origin discovery requires all three gates: embedder `tools`
+      delegation, provider `exposedTo`, and consumer `fromOrigins`. When selecting
+      a tool, inspect its complete `RegisteredTool` identity (`origin` and
+      `window`); different descendant frames can expose the same name.
+      Discovery does not authorize execution or replace server authorization.
+      See the [CG cross-origin gates](https://webmachinelearning.github.io/webmcp/#in-page-cross-origin-exposure).
 - [ ] Pages that must never expose tools (un-audited checkout, admin consoles you
       didn't inventory) can send `Permissions-Policy: tools=()` — suggest it in the
       report where relevant.
