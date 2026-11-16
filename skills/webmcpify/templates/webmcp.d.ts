@@ -55,6 +55,7 @@ interface ToolExecuteCallbackOptions {
   signal: AbortSignal;
 }
 
+/** Fired after callback invocation; cancellation here does not undo started work. */
 interface ToolActivatedEvent extends Event { readonly toolName: string; }
 interface ToolCancelEvent extends Event { readonly toolName: string; }
 interface ModelContextEventMap {
@@ -84,8 +85,10 @@ interface ModelContext extends EventTarget {
   ): Promise<void>;
   ontoolchange: ((this: ModelContext, ev: Event) => unknown) | null;
   /**
-   * Enumerates tools exposed to this document. Added to the CG draft in 2026-07;
-   * intended for in-page agents and test harnesses, not application logic.
+   * Enumerates exposed tools from active documents in the same traversable,
+   * including permitted ancestors and siblings (CG clarification, 2026-11-13).
+   * Cross-origin policy, exposedTo and fromOrigins gates still apply. Intended
+   * for in-page agents and test harnesses, not application logic.
    */
   getTools(options?: { fromOrigins?: string[] }): Promise<RegisteredTool[]>;
   /**
@@ -135,7 +138,11 @@ interface RegisteredTool {
   /** Current draft metadata; older browsers may omit it even when provided at registration. */
   outputSchema?: string | object;
   annotations?: ModelContextToolAnnotations;
-  /** Registering origin (secure origins only). */
+  /**
+   * Browser-serialized registering origin; potentially trustworthy opaque origins
+   * may serialize as "null". Equal strings do not prove equal opaque origins.
+   * Execution support varies by browser; retain the enumerated window identity.
+   */
   origin: string;
   /** Owning window (cross-document enumeration). */
   window: Window;
