@@ -98,6 +98,7 @@ async function listTools(p: Page): Promise<
   Array<{
     name: string;
     inputSchema?: string | object;
+    outputSchema?: string | object;
     annotations?: {
       readOnlyHint?: boolean;
       untrustedContentHint?: boolean;

@@ -11,6 +11,7 @@
   },
   "files": [
     "skills/webmcpify/templates/webmcpify.ts",
-    "skills/webmcpify/templates/webmcp.d.ts"
+    "skills/webmcpify/templates/webmcp.d.ts",
+    "tests/output-schema-usage.ts"
   ]
 }

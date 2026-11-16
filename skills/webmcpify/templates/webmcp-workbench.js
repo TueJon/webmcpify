@@ -55,6 +55,19 @@
     return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]));
   }
 
+  // Schemas are JSON snapshots, not live references to caller-owned objects.
+  function serializeSchema(schema) {
+    if (schema === undefined) return undefined;
+    if (schema === null || !['object', 'function'].includes(typeof schema)) {
+      throw new TypeError('Tool schemas must be objects when provided.');
+    }
+    const serialized = JSON.stringify(schema);
+    if (serialized === undefined) throw new TypeError('Tool schema is not JSON serializable.');
+    return serialized;
+  }
+
+  const optionalSchema = (schema) => schema === undefined ? undefined : parseSchema(schema);
+
   function makeSimulationContext(doc) {
     const tools = new Map();
     const notify = () => doc.dispatchEvent(new Event('toolchange'));
@@ -66,14 +79,23 @@
         }
         if (tools.has(tool.name)) throw new Error(`Tool "${tool.name}" is already registered.`);
         if (options.signal?.aborted) throw options.signal.reason;
-        tools.set(tool.name, { public: { ...tool, execute: undefined }, execute: tool.execute });
+        const inputSchema = serializeSchema(tool.inputSchema);
+        const outputSchema = serializeSchema(tool.outputSchema);
+        tools.set(tool.name, {
+          public: { ...tool, inputSchema: undefined, outputSchema: undefined, execute: undefined },
+          inputSchema, outputSchema, execute: tool.execute,
+        });
         options.signal?.addEventListener('abort', () => {
           if (tools.delete(tool.name)) notify();
         }, { once: true });
         notify();
       },
       async getTools() {
-        return Array.from(tools.values(), ({ public: tool }) => ({ ...tool }));
+        return Array.from(tools.values(), ({ public: tool, inputSchema, outputSchema }) => ({
+          ...tool,
+          inputSchema: inputSchema === undefined ? undefined : JSON.parse(inputSchema),
+          outputSchema: outputSchema === undefined ? undefined : JSON.parse(outputSchema),
+        }));
       },
       // Simulation of current imperative cancellation, not native browser evidence.
       async executeTool(tool, input = {}, options = {}) {
@@ -98,7 +120,7 @@
             return registered.execute(args ?? {}, { signal: execution.signal });
           }).then((result) => {
             if (settled) return;
-            // Native executeTool returns the JSON serialization, including strings.
+            // Draft-shaped simulation; dated Chrome scalar behavior can differ.
             const serialized = JSON.stringify(result);
             if (serialized === undefined) throw new TypeError('Tool result is not JSON serializable.');
             settled = true;
@@ -180,6 +202,7 @@
       ...tool,
       name: tool.name ?? tool.id,
       inputSchema: parseSchema(tool.inputSchema),
+      outputSchema: optionalSchema(tool.outputSchema),
     }));
   }
 
@@ -300,9 +323,10 @@
       const expectedTool = expectedByName.get(tool.name);
       if (!expectedTool) return 'Observed only';
       const schemaMatches = JSON.stringify(canonical(parseSchema(tool.inputSchema))) === JSON.stringify(canonical(expectedTool.inputSchema));
+      const outputMatches = JSON.stringify(canonical(optionalSchema(tool.outputSchema))) === JSON.stringify(canonical(expectedTool.outputSchema));
       const annotationsMatch = !expectedTool.annotations || JSON.stringify(canonical(tool.annotations ?? {})) === JSON.stringify(canonical(expectedTool.annotations));
       const descriptionMatches = !expectedTool.description || tool.description === expectedTool.description;
-      return schemaMatches && annotationsMatch && descriptionMatches ? 'Observed + expected' : 'Contract differs';
+      return schemaMatches && outputMatches && annotationsMatch && descriptionMatches ? 'Observed + expected' : 'Contract differs';
     }
 
     function renderList() {
@@ -388,11 +412,12 @@
       const schema = parseSchema(tool.inputSchema);
       ui.title.textContent = tool.name;
       ui.meta.textContent = `${mutationLabel(tool)} · ${statusLabel(tool)}`;
-      ui.schema.textContent = json(schema);
+      ui.schema.textContent = json(tool.outputSchema === undefined ? schema : { inputSchema: schema, outputSchema: optionalSchema(tool.outputSchema) });
       const expectedTool = expectedByName.get(tool.name);
       ui.expected.textContent = expectedTool ? json({
         description: expectedTool.description,
         inputSchema: expectedTool.inputSchema,
+        outputSchema: expectedTool.outputSchema,
         annotations: expectedTool.annotations,
         mutating: expectedTool.mutating,
       }) : 'Not present in the approved manifest.';
@@ -470,11 +495,11 @@
       const uniqueForms = portableForms.filter((tool) => !registeredNames.has(tool.name));
       for (const tool of uniqueForms) registeredNames.add(tool.name);
       const nextTools = [
-        ...observed.map((tool) => ({ ...tool, inputSchema: parseSchema(tool.inputSchema), _observed: true })),
+        ...observed.map((tool) => ({ ...tool, inputSchema: parseSchema(tool.inputSchema), outputSchema: optionalSchema(tool.outputSchema), _observed: true })),
         ...uniqueForms.map((tool) => ({ ...tool, _observed: true })),
         ...expected.filter((tool) => !registeredNames.has(tool.name)).map((tool) => ({ ...tool, _observed: false })),
       ];
-      const nextFingerprint = JSON.stringify(nextTools.map((tool) => [tool.name, tool.description, tool.inputSchema, tool.annotations, tool._observed]));
+      const nextFingerprint = JSON.stringify(nextTools.map((tool) => [tool.name, tool.description, tool.inputSchema, tool.outputSchema, tool.annotations, tool._observed]));
       if (nextFingerprint === toolFingerprint) return;
       toolFingerprint = nextFingerprint;
       tools = nextTools;
