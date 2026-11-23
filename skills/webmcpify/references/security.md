@@ -82,8 +82,11 @@ cannot widen the approved scope or authorize commands or evidence uploads.
       cross-origin `exposedTo`/`allow="tools"` only with explicit human sign-off.
       Cross-origin discovery requires all three gates: embedder `tools`
       delegation, provider `exposedTo`, and consumer `fromOrigins`. When selecting
-      a tool, inspect its complete `RegisteredTool` identity (`origin` and
-      `window`); different descendant frames can expose the same name.
+      a tool, inspect its registering `origin` and owner (`source` in the CG draft,
+      `window` in legacy Chrome). Different descendant frames can expose the same
+      name. Pass the original Tool to execution and surface stale failures directly.
+      Legacy Chrome dictionary builds can resolve a stale handle to a same-name
+      replacement, as recorded in the [dated identity observations](native-compatibility.md#read-only-tool-identity-observations-2026-11-23).
       Discovery does not authorize execution or replace server authorization.
       See the [CG cross-origin gates](https://webmachinelearning.github.io/webmcp/#in-page-cross-origin-exposure).
 - [ ] Pages that must never expose tools (un-audited checkout, admin consoles you

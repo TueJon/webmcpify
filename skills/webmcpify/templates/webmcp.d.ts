@@ -129,23 +129,28 @@ interface ModelContextTool {
   annotations?: ModelContextToolAnnotations;
 }
 
-/** Shape returned by getTools(). Older Chrome may stringify JSON Schema — handle both forms. */
+/**
+ * Handle returned by getTools(). The CG Tool interface exposes read-only
+ * prototype attributes and binds execution to one registration. Older Chrome
+ * may return a plain dictionary with different metadata and lifetime semantics.
+ * Pass the original handle directly to executeTool.
+ */
 interface RegisteredTool {
-  name: string;
-  title?: string;
-  description: string;
-  inputSchema?: string | object;
-  /** Current draft metadata; older browsers may omit it even when provided at registration. */
-  outputSchema?: string | object;
-  annotations?: ModelContextToolAnnotations;
+  readonly name: string;
+  readonly title?: string;
+  readonly description: string;
+  readonly inputSchema?: string | object | null;
+  readonly outputSchema?: string | object | null;
+  readonly annotations?: ModelContextToolAnnotations | null;
   /**
-   * Browser-serialized registering origin; potentially trustworthy opaque origins
+   * Browser-serialized registering origin. Opaque origins in secure contexts
    * may serialize as "null". Equal strings do not prove equal opaque origins.
-   * Execution support varies by browser; retain the enumerated window identity.
    */
-  origin: string;
-  /** Owning window (cross-document enumeration). */
-  window: Window;
+  readonly origin: string;
+  /** CG owner window. Null when the registering document is no longer active. */
+  readonly source?: Window | null;
+  /** Legacy Chrome owner window. Its proxy can follow a replacement document. */
+  readonly window?: Window | null;
 }
 
 interface Document {

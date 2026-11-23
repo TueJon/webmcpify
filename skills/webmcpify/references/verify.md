@@ -39,11 +39,17 @@ const tools = await mc.getTools();
 
 Contract facts that generated assertions MUST respect:
 
+- Read metadata explicitly from the returned Tool. Prototype getters are omitted
+  by object spread and Playwright's value serialization. Project assertion fields
+  inside the page, keep the original execution handle there, and surface stale
+  failures directly. See the [dated identity observations](native-compatibility.md#read-only-tool-identity-observations-2026-11-23)
+  for the legacy dictionary behavior.
 - Enumerated `inputSchema` may be stringified (older Chrome) or object (current
   implementations/spec stubs) — `typeof === "string" ? JSON.parse(s) : s ??
   {type:'object',properties:{}}` before comparing.
 - When the approved contract declares optional `outputSchema`, normalize its
-  string/object representation without turning omission into an empty schema.
+  string/object representation without turning null or omitted metadata into an
+  empty schema.
   Compare it when exposed; a difference is contract drift. If the browser omits
   it (observed Chrome 156.0.8078.47, 2026-11-09), record unsupported native
   metadata propagation and prove registration in app/unit tests instead. Never
@@ -182,8 +188,8 @@ used Playwright 1.64.1 with headed Chrome 156.0.8078.47:
 **A fulfilled call is not a pass:** `callTool()` returns `isError: true` results
 without throwing, so inspect that flag and the application result explicitly.
 Keep the in-page adapter when checking metadata not exposed by this alternative,
-including annotations and complete `RegisteredTool` origin/window identity;
-a name/count check cannot replace those assertions. Keep the host journal around
+including annotations and the registering origin and owner (`source` in the CG
+draft, `window` in the tested builds). Use the in-page handle for execution. Keep the host journal around
 every mutation, invalid example and cleanup, and reconcile interrupted attempts
 before replay. Do not upgrade the target's toolchain or install another browser
 merely to use this alternative; the pinned standalone-harness default above stays

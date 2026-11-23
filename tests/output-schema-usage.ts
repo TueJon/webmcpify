@@ -14,7 +14,7 @@ const invalidOutputContract: ModelContextTool = {
   execute: async () => ({ label: 'fixture' }),
 };
 void invalidOutputContract;
-function readOutputContract(tool: RegisteredTool): object | string | undefined {
+function readOutputContract(tool: RegisteredTool): object | string | null | undefined {
   return tool.outputSchema;
 }
 void readOutputContract;

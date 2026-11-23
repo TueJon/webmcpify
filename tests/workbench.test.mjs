@@ -79,6 +79,32 @@ test('simulated context registers, enumerates, executes and aborts tools', async
   assert.deepEqual(events, ['toolchange', 'toolchange']);
 });
 
+test('simulation dispatches only the registration associated with the original handle', async () => {
+  const context = loadApi().createSimulationContext({ dispatchEvent() {} });
+  const controller = new AbortController();
+  const calls = [];
+  const register = (label, signal) => context.registerTool({
+    name: 'read_label',
+    async execute() { calls.push(label); return { label }; },
+  }, { signal });
+
+  await register('original', controller.signal);
+  const [original] = await context.getTools();
+  const [anotherHandle] = await context.getTools();
+  assert.notEqual(original, anotherHandle);
+  assert.equal(await context.executeTool(anotherHandle), '{"label":"original"}');
+  await assert.rejects(context.executeTool({ ...original }), { name: 'NotFoundError' });
+
+  const pending = context.executeTool(original);
+  controller.abort();
+  await register('replacement');
+  await assert.rejects(pending, { name: 'NotFoundError' });
+  await assert.rejects(context.executeTool(original), { name: 'NotFoundError' });
+  const [replacement] = await context.getTools();
+  assert.equal(await context.executeTool(replacement), '{"label":"replacement"}');
+  assert.deepEqual(calls, ['original', 'replacement']);
+});
+
 test('execute input probe distinguishes current object and legacy JSON-string browsers', async () => {
   const api = loadApi({ crypto: { randomUUID: () => 'probe-id' } });
   const makeContext = (mode) => {

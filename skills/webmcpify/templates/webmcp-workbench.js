@@ -66,10 +66,11 @@
     return serialized;
   }
 
-  const optionalSchema = (schema) => schema === undefined ? undefined : parseSchema(schema);
+  const optionalSchema = (schema) => schema == null ? undefined : parseSchema(schema);
 
   function makeSimulationContext(doc) {
     const tools = new Map();
+    const registrations = new WeakMap();
     const notify = () => doc.dispatchEvent(new Event('toolchange'));
     const context = {
       __webmcpStubObjectMode: true,
@@ -81,27 +82,36 @@
         if (options.signal?.aborted) throw options.signal.reason;
         const inputSchema = serializeSchema(tool.inputSchema);
         const outputSchema = serializeSchema(tool.outputSchema);
-        tools.set(tool.name, {
-          public: { ...tool, inputSchema: undefined, outputSchema: undefined, execute: undefined },
-          inputSchema, outputSchema, execute: tool.execute,
-        });
+        const name = tool.name;
+        const registration = {
+          metadata: { ...tool, execute: undefined },
+          inputSchema, outputSchema, execute: tool.execute, active: true,
+        };
+        tools.set(name, registration);
         options.signal?.addEventListener('abort', () => {
-          if (tools.delete(tool.name)) notify();
+          registration.active = false;
+          tools.delete(name);
+          notify();
         }, { once: true });
         notify();
       },
       async getTools() {
-        return Array.from(tools.values(), ({ public: tool, inputSchema, outputSchema }) => ({
-          ...tool,
-          inputSchema: inputSchema === undefined ? undefined : JSON.parse(inputSchema),
-          outputSchema: outputSchema === undefined ? undefined : JSON.parse(outputSchema),
-        }));
+        return Array.from(tools.values(), (registration) => {
+          const { metadata, inputSchema, outputSchema } = registration;
+          const handle = {
+            ...metadata,
+            inputSchema: inputSchema === undefined ? undefined : JSON.parse(inputSchema),
+            outputSchema: outputSchema === undefined ? undefined : JSON.parse(outputSchema),
+          };
+          registrations.set(handle, registration);
+          return handle;
+        });
       },
       // Simulation of current imperative cancellation, not native browser evidence.
       async executeTool(tool, input = {}, options = {}) {
         if (options.signal?.aborted) throw options.signal.reason;
-        const registered = tools.get(tool?.name);
-        if (!registered) throw new Error(`Tool "${tool?.name ?? 'unknown'}" is not registered.`);
+        const registered = registrations.get(tool);
+        if (!registered?.active) throw new DOMException('Tool registration is no longer available.', 'NotFoundError');
         const args = typeof input === 'string' ? JSON.parse(input) : input;
         const execution = new AbortController();
         return new Promise((resolve, reject) => {
@@ -117,6 +127,7 @@
           options.signal?.addEventListener('abort', onAbort, { once: true });
           Promise.resolve().then(() => {
             if (settled) return;
+            if (!registered.active) throw new DOMException('Tool registration is no longer available.', 'NotFoundError');
             return registered.execute(args ?? {}, { signal: execution.signal });
           }).then((result) => {
             if (settled) return;
@@ -296,6 +307,7 @@
     let selectedName = '';
     let pendingRun = null;
     let toolFingerprint = '';
+    let refreshSequence = 0;
     let fieldSchema = null;
     const history = [];
 
@@ -407,6 +419,10 @@
     }
 
     function renderDetail() {
+      if (ui.confirm.open) {
+        pendingRun = null;
+        ui.confirm.close();
+      }
       const tool = selected();
       if (!tool) return;
       const schema = parseSchema(tool.inputSchema);
@@ -447,8 +463,7 @@
       return output;
     }
 
-    async function execute() {
-      const tool = selected();
+    async function execute(tool) {
       if (!tool || tool._observed === false || excludedByName.has(tool.name)) return;
       ui.run.disabled = true;
       ui.resultMeta.textContent = 'Running…';
@@ -459,7 +474,7 @@
         const inputMode = await detectExecuteInputMode(installed);
         const result = tool._declarativeForm
           ? await executeDeclarative(tool, args)
-          : await installed.context.executeTool(tool, inputMode === 'object' ? args : JSON.stringify(args));
+          : await installed.context.executeTool(tool.handle, inputMode === 'object' ? args : JSON.stringify(args));
         ui.result.textContent = json(result);
         const duration = Math.round(performance.now() - started);
         ui.resultMeta.textContent = `Succeeded · ${duration} ms`;
@@ -480,33 +495,43 @@
     function requestRun() {
       const tool = selected();
       if (!tool) return;
-      if (mutationLabel(tool) === 'Read only') return execute();
+      if (mutationLabel(tool) === 'Read only') return execute(tool);
       ui.confirmText.textContent = `${tool.name} may change application state. Run it once with the visible arguments?`;
-      pendingRun = execute;
+      pendingRun = () => execute(tool);
       ui.confirm.showModal();
     }
 
     async function refresh() {
+      const sequence = ++refreshSequence;
       let observed = [];
       try { observed = await installed.context.getTools(); } catch (error) { ui.live.textContent = `Could not enumerate tools: ${error}`; }
+      if (sequence !== refreshSequence) return;
       const observedNames = new Set(observed.map((tool) => tool.name));
       const portableForms = installed.evidence === 'simulated' ? declarativeTools(doc) : [];
       const registeredNames = new Set(observedNames);
       const uniqueForms = portableForms.filter((tool) => !registeredNames.has(tool.name));
       for (const tool of uniqueForms) registeredNames.add(tool.name);
       const nextTools = [
-        ...observed.map((tool) => ({ ...tool, inputSchema: parseSchema(tool.inputSchema), outputSchema: optionalSchema(tool.outputSchema), _observed: true })),
+        ...observed.map((handle) => ({
+          handle,
+          name: handle.name,
+          description: handle.description,
+          inputSchema: parseSchema(handle.inputSchema),
+          outputSchema: optionalSchema(handle.outputSchema),
+          annotations: handle.annotations,
+          _observed: true,
+        })),
         ...uniqueForms.map((tool) => ({ ...tool, _observed: true })),
         ...expected.filter((tool) => !registeredNames.has(tool.name)).map((tool) => ({ ...tool, _observed: false })),
       ];
       const nextFingerprint = JSON.stringify(nextTools.map((tool) => [tool.name, tool.description, tool.inputSchema, tool.outputSchema, tool.annotations, tool._observed]));
+      tools = nextTools;
       if (nextFingerprint === toolFingerprint) return;
       toolFingerprint = nextFingerprint;
-      tools = nextTools;
       if (!tools.some((tool) => tool.name === selectedName)) selectedName = tools[0]?.name ?? '';
       renderList();
-      if (selectedName) renderDetail();
-      else {
+      renderDetail();
+      if (!selectedName) {
         ui.title.textContent = 'No tools yet';
         ui.meta.textContent = 'Waiting for registration';
         ui.run.textContent = 'Run tool';
