@@ -98,6 +98,7 @@ async function listTools(p: Page): Promise<
   Array<{
     name: string;
     inputSchema?: string | object;
+    outputSchema?: string | object;
     annotations?: {
       readOnlyHint?: boolean;
       untrustedContentHint?: boolean;
@@ -107,7 +108,17 @@ async function listTools(p: Page): Promise<
 > {
   return p.evaluate(async () => {
     const mc = (document as any).modelContext;
-    if (mc?.getTools) return mc.getTools();
+    if (mc?.getTools) {
+      const tools = await mc.getTools();
+      // Tool metadata lives on prototype getters. Only project assertion data
+      // across the Playwright boundary; the browser keeps the execution handles.
+      return tools.map((tool: RegisteredTool) => ({
+        name: tool.name,
+        inputSchema: tool.inputSchema ?? undefined,
+        outputSchema: tool.outputSchema ?? undefined,
+        annotations: tool.annotations ?? undefined,
+      }));
+    }
     throw new Error('No document.modelContext enumeration surface — insecure origin, headless/wrong Chrome, reused profile, or missing flag');
   });
 }
@@ -166,8 +177,10 @@ async function executeTool(p: Page, name: string, args: object): Promise<string 
       const mc = (document as any).modelContext;
       if (mc?.getTools) {
         const tools = await mc.getTools();
-        const tool = tools.find((t: { name: string }) => t.name === name);
-        if (!tool) throw new Error(`tool ${name} is not registered`);
+        const matches = tools.filter((t: { name: string }) => t.name === name);
+        if (!matches.length) throw new Error(`tool ${name} is not registered`);
+        if (matches.length !== 1) throw new Error(`tool ${name} is ambiguous across registrations`);
+        const [tool] = matches;
         // Explicit adapter mode — a harmless probe chose the native shape.
         // - tool.execute(object): headless-era stub
         // - mc.__webmcpStubObjectMode + mc.executeTool(tool, object): spec-shaped stub (enumerated tool has no .execute)

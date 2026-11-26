@@ -7,7 +7,7 @@ import { chromium, firefox, webkit } from 'playwright';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const source = await readFile(join(root, 'skills/webmcpify/templates/webmcp-workbench.js'), 'utf8');
-const output = '/tmp/webmcpify-workbench-browser';
+const output = process.env.WEBMCPIFY_BROWSER_OUTPUT ?? '/tmp/webmcpify-workbench-browser';
 await mkdir(output, { recursive: true });
 
 function contrastRatio(foreground, background) {
@@ -192,6 +192,74 @@ try {
         assert.match(await host.locator('.result').textContent(), /"count": 3/);
         await context.close();
         console.log('chromium: native transport path passed');
+
+        const identityContext = await browser.newContext();
+        await identityContext.addInitScript({ content: `
+          const registrations = new Map();
+          const handles = new WeakMap();
+          class Tool {
+            get name() { return handles.get(this).name; }
+            get description() { return handles.get(this).description; }
+            get inputSchema() { return handles.get(this).inputSchema ?? null; }
+            get outputSchema() { return handles.get(this).outputSchema ?? null; }
+            get annotations() { return handles.get(this).annotations ?? null; }
+            get source() { return window; }
+          }
+          Object.defineProperty(document, 'modelContext', { value: {
+            async registerTool(tool, { signal } = {}) {
+              registrations.set(tool.name, tool);
+              signal?.addEventListener('abort', () => registrations.delete(tool.name), { once: true });
+            },
+            async getTools() {
+              return [...registrations.values()].map(registration => {
+                const handle = new Tool();
+                handles.set(handle, registration);
+                return handle;
+              });
+            },
+            async executeTool(handle, input) {
+              const registration = handles.get(handle);
+              if (!registration) throw new TypeError('Expected a Tool handle');
+              if (registrations.get(registration.name) !== registration) {
+                throw new DOMException('Registration expired', 'NotFoundError');
+              }
+              return JSON.stringify(await registration.execute(input));
+            }
+          } });
+          globalThis.__WEBMCPIFY_WORKBENCH__ = { expectedTools: [{ id: 'search_tickets', mutating: 'server' }], open: true };
+          ${source}
+        ` });
+        const identityPage = await identityContext.newPage();
+        await identityPage.goto(url);
+        const identityHost = identityPage.locator('#webmcpify-workbench');
+        const runButton = identityHost.locator('.run');
+        await identityHost.locator('input[name="query"]').fill('original');
+        await runButton.click();
+        await identityHost.locator('.confirm-run').click();
+        await identityHost.locator('.result-meta', { hasText: 'Succeeded' }).waitFor();
+        assert.match(await identityHost.locator('.result').textContent(), /"query": "original"/);
+
+        await runButton.click();
+        await identityPage.evaluate(async () => {
+          const old = (await document.modelContext.getTools()).find(tool => tool.name === 'search_tickets');
+          if (old.source !== window || Object.keys(old).length) throw new Error('Expected prototype metadata and source');
+          window.replacementCalls = 0;
+          await document.modelContext.registerTool({
+            name: old.name, description: old.description, inputSchema: old.inputSchema, annotations: old.annotations,
+            async execute() { window.replacementCalls++; return { replacement: true }; },
+          });
+          await window.WebMCPifyWorkbench.start().refresh();
+        });
+        await identityHost.locator('.confirm-run').click();
+        await identityHost.locator('.result-meta', { hasText: 'Failed' }).waitFor();
+        assert.match(await identityHost.locator('.result').textContent(), /Registration expired/);
+        assert.equal(await identityPage.evaluate(() => window.replacementCalls), 0);
+        await runButton.click();
+        await identityHost.locator('.confirm-run').click();
+        await identityHost.locator('.result', { hasText: '"replacement": true' }).waitFor();
+        assert.equal(await identityPage.evaluate(() => window.replacementCalls), 1);
+        await identityContext.close();
+        console.log('chromium: Tool prototype metadata and confirmation identity passed (synthetic transport)');
 
         const cspContext = await browser.newContext({ viewport: { width: 900, height: 700 } });
         await cspContext.addInitScript({ content: `globalThis.__WEBMCPIFY_WORKBENCH__ = { open: true };\n${source}` });

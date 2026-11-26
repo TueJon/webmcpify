@@ -134,6 +134,13 @@ Never erase existing journal entries during migration or contract invalidation.
 
 ## Resume with bounded invalidation
 
+Compare optional `outputSchema` alongside inputSchema and annotations in the
+approved contract. Addition, removal or change of outputSchema is contract drift
+and returns the affected tool to its approval gate; preserve all mutation journal
+entries. Omission is distinct from a declared empty schema. The Workbench's
+output-aware refresh fingerprint is display evidence, not the journal argument
+fingerprint or a substitute for `verifiedAgainst` dependency hashes.
+
 1. `status` reads and reports counts plus evidence age/unknowns; it never starts a
    browser, changes statuses or executes tools. `inventory` remains inventory-only.
 2. In `full` or `verify`, compare recorded contracts, relevant files and the test

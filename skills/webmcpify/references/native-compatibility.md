@@ -1,4 +1,4 @@
-# Native compatibility — documentation checked 2026-10-12
+# Native compatibility — documentation checked 2026-11-23
 
 WebMCP is evolving. These are separate evidence levels; simulation results are
 not native browser acceptance.
@@ -7,18 +7,20 @@ not native browser acceptance.
 
 The [CG draft](https://webmachinelearning.github.io/webmcp/) specifies callback
 options containing an execution signal, optional input defaulting to `{}`, and
-JSON serialization of successful imperative results. A callback returning `"done"`
-therefore produces the JSON string text `"done"` at `executeTool`, including the
-quotes; a callback object produces serialized JSON. Callback values and native
-client results are different boundaries. Browser-owned `null` for declarative
+JSON serialization of successful imperative results. Under that draft algorithm,
+a callback returning `"done"` produces JSON-quoted text; native Chrome scalar
+behavior can differ (see the Nov9 observations below and open
+[issue #361](https://github.com/webmachinelearning/webmcp/issues/361)). Callback
+values, draft expectations and native results are separate boundaries.
+Browser-owned `null` for declarative
 navigation is separate from the runtime guard against absent imperative results.
 
 The [Chrome imperative guide](https://developer.chrome.com/docs/ai/webmcp/imperative-api)
-(updated 2026-09-21) documents execution cancellation via callback `{ signal }`,
-Chrome 153 preserving in-flight executions when tools are unregistered, Chrome 155
-deprecating JSON-string input in favor of object input, and the `debugging`
-annotation from Chrome 156. These version claims are documentation, not proof
-from the installed Chrome 150 run.
+(updated 2026-11-20) documents execution cancellation via callback `{ signal }`,
+preservation of in-flight executions from Chrome 153, deprecation of JSON-string
+input from Chrome 155, the `debugging` annotation from Chrome 156, and
+`outputSchema` from Chrome 159. The guide describes the owner as `source`.
+See the versioned observations below for the local browser surfaces.
 
 The [Chrome declarative guide](https://developer.chrome.com/docs/ai/webmcp/declarative-api)
 (updated 2026-09-25) documents `agentInvoked` and `respondWith` after
@@ -63,11 +65,76 @@ WebMCPTesting, temporary synthetic loopback fixture only. All five probes pass:
 | Registration abort during execution | Tool disappeared; already-started callback completed, side effect ran, and caller fulfilled. |
 | Omitted execute input | Callback invoked once with `{}`. |
 
-Successful imperative results arrived as serialized JSON strings: the callback
+Successful object-callback results arrived as serialized JSON strings: the callback
 object `{ accepted: true }` produced the string `{"accepted":true}`. `unregisterTool`
 was absent; removal was tested only through the registration AbortSignal, not a
 distinct unregister operation. These five probes do not establish native WPT,
 declarative submission/navigation, or debugging-annotation conformance.
+
+## Read-only native observations: Chrome 156 stable, 2026-11-09
+
+Headed Chrome 156.0.8078.47 with WebMCP/WebMCPTesting and Playwright 1.61.1,
+fresh dedicated context, ephemeral loopback fixture and read-only synthetic tools:
+
+| Callback value | Native result | Draft-shaped Workbench simulation |
+|---|---|---|
+| string `hi` | unquoted string `hi` | JSON-quoted text |
+| object `{a:1}` | JSON text | JSON text |
+| number / boolean / null | strings `3` / `true` / `null` | same |
+| undefined / function | string `undefined` | rejection |
+| BigInt `1n` | string `1` | rejection |
+| nested BigInt / thrown error | UnknownError rejection | TypeError / Error rejection |
+
+Input schemas were isolated from source/enumeration mutation, and four invalid
+input schemas rejected. `outputSchema` was absent from enumeration; four invalid
+output schemas were ignored by this installed browser. Native output-metadata
+propagation/deep-copy conformance is therefore unsupported, not verified. The
+[Nov2 draft addition](https://github.com/webmachinelearning/webmcp/pull/254)
+defines optional outputSchema and schema JSON snapshot semantics; it does not
+guarantee automatic output validation or application authorization.
+
+Three target-document calls (registration, enumeration, execution) on a
+same-origin iframe denied `tools` rejected with NotAllowedError. The initial
+about:blank replacement evaluation timed out after 12 seconds; no document-
+lifetime pass is claimed. Experimental `waitForToolsUntil` was not invoked.
+These custom observations are not WPT conformance or Chrome158 acceptance.
+
+The corrected simulation JSON-snapshots both schemas at registration, rejects
+serialization failures and returns fresh schema copies at enumeration. It models
+draft metadata/serialization semantics, not every installed browser. Preserve raw
+native results and absent-result guards; a mismatch is not permission to retry
+application mutations or discard unknown-outcome journal entries.
+
+## Read-only Tool identity observations, 2026-11-23
+
+Headed Chrome 156.0.8078.47 and cached Chrome for Testing 159.0.8154.6 with
+WebMCP/WebMCPTesting and Playwright 1.61.1. A parent document enumerated and
+executed a read-only synthetic tool from a same-origin iframe.
+
+| Probe | Chrome 156.0.8078.47 | Chrome for Testing 159.0.8154.6 |
+|---|---|---|
+| Enumerated shape | Mutable dictionary with own fields | Read-only prototype getters, no enumerable own fields |
+| Copy passed to `executeTool` | Shallow spread invoked the original | Spread rejected with TypeError |
+| Omitted schemas and annotations | Undefined | Null |
+| Supplied `outputSchema` | Unavailable | Exposed |
+| Source of a live frame | `window` matched the child, `source` unavailable | `window` matched the child, `source` unavailable |
+| Original handle after same-name re-registration | Invoked replacement | NotFoundError |
+| Original handle after same-origin frame navigation and same-name registration | Invoked replacement | InvalidStateError |
+| Original handle after frame detachment | InvalidStateError | InvalidStateError |
+
+Chrome 159 rejected all stale attempts before callback dispatch. Both builds
+returned different wrapper objects on repeated enumeration and rejected
+`structuredClone`. [CG PR #348](https://github.com/webmachinelearning/webmcp/pull/348)
+describes registration identity underneath these wrappers and a nullable
+`source` getter for the owning document. The local builds did not expose that
+getter. The navigation rows above called through a still-active parent context.
+The earlier saved-caller-context timeout, opaque-origin and scalar results
+retain their separately measured limits.
+
+Keep the exact enumerated handle for execution. Project metadata explicitly for
+UI or assertions, including when a prototype exposes the fields. A metadata
+match cannot establish registration identity on legacy dictionary builds.
+Use a browser with registration-bound handles when stale rejection is required.
 
 ## Local runtime and verification boundaries
 

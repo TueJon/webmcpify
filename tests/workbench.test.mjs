@@ -79,6 +79,32 @@ test('simulated context registers, enumerates, executes and aborts tools', async
   assert.deepEqual(events, ['toolchange', 'toolchange']);
 });
 
+test('simulation dispatches only the registration associated with the original handle', async () => {
+  const context = loadApi().createSimulationContext({ dispatchEvent() {} });
+  const controller = new AbortController();
+  const calls = [];
+  const register = (label, signal) => context.registerTool({
+    name: 'read_label',
+    async execute() { calls.push(label); return { label }; },
+  }, { signal });
+
+  await register('original', controller.signal);
+  const [original] = await context.getTools();
+  const [anotherHandle] = await context.getTools();
+  assert.notEqual(original, anotherHandle);
+  assert.equal(await context.executeTool(anotherHandle), '{"label":"original"}');
+  await assert.rejects(context.executeTool({ ...original }), { name: 'NotFoundError' });
+
+  const pending = context.executeTool(original);
+  controller.abort();
+  await register('replacement');
+  await assert.rejects(pending, { name: 'NotFoundError' });
+  await assert.rejects(context.executeTool(original), { name: 'NotFoundError' });
+  const [replacement] = await context.getTools();
+  assert.equal(await context.executeTool(replacement), '{"label":"replacement"}');
+  assert.deepEqual(calls, ['original', 'replacement']);
+});
+
 test('execute input probe distinguishes current object and legacy JSON-string browsers', async () => {
   const api = loadApi({ crypto: { randomUUID: () => 'probe-id' } });
   const makeContext = (mode) => {
@@ -110,6 +136,54 @@ test('simulated context rejects duplicate and malformed registrations', async ()
   await assert.rejects(() => context.registerTool({ name: 'broken' }), /execute function/);
   await context.registerTool({ name: 'one', execute() {} });
   await assert.rejects(() => context.registerTool({ name: 'one', execute() {} }), /already registered/);
+});
+
+test('simulation snapshots input/output schemas at registration and each enumeration', async () => {
+  const context = loadApi().createSimulationContext({ dispatchEvent() {} });
+  const inputSchema = { type: 'object', properties: { q: { type: 'string' } } };
+  const outputSchema = { type: 'object', properties: { value: { type: 'string' } } };
+  await context.registerTool({ name: 'read_schema', description: 'Reads fixture data.', inputSchema, outputSchema, execute: async () => ({ value: 'ok' }) });
+  inputSchema.properties.q.type = 'number';
+  outputSchema.properties.value.type = 'number';
+  const [first] = await context.getTools();
+  assert.equal(first.inputSchema.properties.q.type, 'string');
+  assert.equal(first.outputSchema.properties.value.type, 'string');
+  first.inputSchema.properties.q.type = 'boolean';
+  first.outputSchema.properties.value.type = 'boolean';
+  const [second] = await context.getTools();
+  assert.equal(second.inputSchema.properties.q.type, 'string');
+  assert.equal(second.outputSchema.properties.value.type, 'string');
+  assert.equal(await context.executeTool(second, {}), '{"value":"ok"}');
+});
+
+test('schema serialization fails before registration and leaves the name reusable', async () => {
+  for (const field of ['inputSchema', 'outputSchema']) {
+    for (const makeInvalid of [
+      () => { const schema = {}; schema.self = schema; return schema; },
+      () => ({ value: 1n }),
+      () => ({ toJSON() { return undefined; } }),
+      () => 'not an object',
+      () => null,
+    ]) {
+      const events = [];
+      const context = loadApi().createSimulationContext({ dispatchEvent(event) { events.push(event.type); } });
+      await assert.rejects(context.registerTool({ name: 'read_schema', [field]: makeInvalid(), execute: async () => ({ ok: true }) }), { name: 'TypeError' });
+      assert.equal((await context.getTools()).length, 0);
+      assert.equal(events.length, 0);
+      await context.registerTool({ name: 'read_schema', execute: async () => ({ ok: true }) });
+      assert.equal((await context.getTools()).length, 1);
+    }
+  }
+});
+
+test('schema snapshots use JSON serialization, permit omission and preserve metadata', async () => {
+  const context = loadApi().createSimulationContext({ dispatchEvent() {} });
+  await context.registerTool({ name: 'read_custom', outputSchema: { toJSON() { return { type: 'string' }; } }, execute: async () => 'value' });
+  await context.registerTool({ name: 'read_omitted', inputSchema: undefined, outputSchema: undefined, execute: async () => 'value' });
+  const [custom, omitted] = await context.getTools();
+  assert.equal(JSON.stringify(custom.outputSchema), '{"type":"string"}');
+  assert.equal(omitted.inputSchema, undefined);
+  assert.equal(omitted.outputSchema, undefined);
 });
 
 test('stopping before DOM readiness removes the pending simulation context', async () => {
