@@ -16,17 +16,20 @@ jobs:
     runs-on: [self-hosted, Linux, X64, tuejon-ci, ci-public]
     steps:
       - name: Verify runner isolation
+        env:
+          PROTECTED_HOME: ${{ secrets.PUBLIC_RUNNER_PROTECTED_HOME }}
         run: |
+          test -n "$PROTECTED_HOME"
           test "$(id -un)" = ci-public
           test -z "$(id -nG | tr ' ' '\n' | grep -E '^(sudo|docker)$' || true)"
-          test ! -r /home/vd/.ssh/id_ed25519
+          test ! -r "$PROTECTED_HOME/.ssh/id_ed25519"
           test ! -r /run/docker.sock
           ! sudo -n true 2>/dev/null
-          python3 -c 'import os; assert not os.access("/home/vd", os.R_OK | os.X_OK)'
+          python3 -c 'import os; assert not os.access(os.environ["PROTECTED_HOME"], os.R_OK | os.X_OK)'
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.5
           cache: npm
       - run: npm ci
       - run: npm run check
